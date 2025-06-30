@@ -1,1 +1,1 @@
-# SDK ksef 2.0 beta
+# SDK ksef 2.0 
