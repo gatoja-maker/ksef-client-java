@@ -1,0 +1,6 @@
+server:
+  port: 8082
+ksef:
+  sdk:
+    publicKey:
+      path: /publicKey.pem
