@@ -15,32 +15,42 @@ import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.Security;
 import java.security.cert.X509Certificate;
-import java.security.spec.RSAKeyGenParameterSpec;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
 
 public class DefaultCertificateGenerator implements CertificateGenerator {
-    public static final String RSA = "RSA";
-    public static final String SHA_256_WITH_RSA = "SHA256WithRSA";
-    public static final String BC = "BC";
+    private static final String RSA = "RSA";
+    private static final String EC = "EC";
+    private static final String SHA_256_WITH_RSA = "SHA256WithRSA";
+    private static final String SHA_256_WITH_ECDSA = "SHA256withECDSA";
+    private static final String BC = "BC";
 
-    public SelfSignedCertificate generateSelfSignedCertificate(X500Name x500Name) throws SystemKSeFSDKException {
+    @Override
+    public SelfSignedCertificate generateSelfSignedCertificateRsa(X500Name x500Name) {
+
+        return generateSelfSignedCertificate(RSA, 2048, SHA_256_WITH_RSA, x500Name);
+    }
+
+    @Override
+    public SelfSignedCertificate generateSelfSignedCertificateEcdsa(X500Name x500Name) {
+
+        return generateSelfSignedCertificate(EC, 256, SHA_256_WITH_ECDSA, x500Name);
+    }
+
+    private SelfSignedCertificate generateSelfSignedCertificate(String generatorAlgorithm, int generatorKeySize, String signatureAlgorithm, X500Name x500Name) {
         try {
             Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider());
 
-            // Generate RSA key pair
-            KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance(RSA);
-            keyPairGenerator.initialize(new RSAKeyGenParameterSpec(2048, RSAKeyGenParameterSpec.F4));
+            KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance(generatorAlgorithm);
+            keyPairGenerator.initialize(generatorKeySize);
             KeyPair keyPair = keyPairGenerator.generateKeyPair();
 
-            // Certificate validity period
             Instant now = Instant.now();
             Date notBefore = Date.from(now);
             Date notAfter = Date.from(now.plus(365, ChronoUnit.DAYS));
 
-            // Create certificate info
-            BigInteger certSerialNumber = new BigInteger(Long.toString(System.currentTimeMillis())); // <-- Using the current timestamp as the certificate serial number
+            BigInteger certSerialNumber = new BigInteger(Long.toString(System.currentTimeMillis()));
 
             JcaX509v3CertificateBuilder certBuilder = new JcaX509v3CertificateBuilder(
                     x500Name,
@@ -51,15 +61,12 @@ public class DefaultCertificateGenerator implements CertificateGenerator {
                     keyPair.getPublic()
             );
 
-            // Create content signer
-            ContentSigner contentSigner = new JcaContentSignerBuilder(SHA_256_WITH_RSA)
+            ContentSigner contentSigner = new JcaContentSignerBuilder(signatureAlgorithm)
                     .setProvider(BC)
                     .build(keyPair.getPrivate());
 
-            // Build the certificate
             X509CertificateHolder certHolder = certBuilder.build(contentSigner);
 
-            // Convert to X509Certificate
             JcaX509CertificateConverter certConverter = new JcaX509CertificateConverter()
                     .setProvider(BC);
             X509Certificate certificate = certConverter.getCertificate(certHolder);

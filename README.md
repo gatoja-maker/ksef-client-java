@@ -6,6 +6,7 @@
 Projekt składa się z dwóch modułów:
 - **demo-web-app** – przykładowa aplikacja webowa (spring boot), która używa SDK i rozszerza o przykładowe użycia czy scenariusze testowe.
 - **ksef-client** – biblioteka (SDK), zawierająca wspólną logikę, modele oraz interfejsy.
++ katalogu .http z wywołaniami testowych usług z `demo-web-app`, które w określonych scenariuszach bądź bezpośrednio wywołują usługi z klienta  
 
 Całość napisana jest w języku **Java**. Do komunikacji HTTP wykorzystywany jest java.net.http.HttpClient.
 

@@ -36,13 +36,6 @@ public class SelfSignedCertificate {
         return Objects.hash(certificate, keyPair);
     }
 
-    @Override
-    public String toString() {
-        return "SelfSignedCertificate[" +
-                "certificate=" + certificate + ", " +
-                "keyPair=" + keyPair + ']';
-    }
-
     public PrivateKey getPrivateKey() {
         return keyPair.getPrivate();
     }

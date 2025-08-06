@@ -1,16 +1,16 @@
 package pl.akmf.ksef.sdk.client.model.auth;
 
-import java.time.OffsetDateTime;
+import java.time.Instant;
 
 public class AuthenticationChallengeResponse {
     private String challenge;
-    private OffsetDateTime timestamp;
+    private Instant timestamp;
 
     public AuthenticationChallengeResponse() {
 
     }
 
-    public AuthenticationChallengeResponse(String challenge, OffsetDateTime timestamp) {
+    public AuthenticationChallengeResponse(String challenge, Instant timestamp) {
         this.challenge = challenge;
         this.timestamp = timestamp;
     }
@@ -23,11 +23,11 @@ public class AuthenticationChallengeResponse {
         this.challenge = challenge;
     }
 
-    public OffsetDateTime getTimestamp() {
+    public Instant getTimestamp() {
         return timestamp;
     }
 
-    public void setTimestamp(OffsetDateTime timestamp) {
+    public void setTimestamp(Instant timestamp) {
         this.timestamp = timestamp;
     }
 }

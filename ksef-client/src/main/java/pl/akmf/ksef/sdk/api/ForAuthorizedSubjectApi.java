@@ -11,96 +11,25 @@ import pl.akmf.ksef.sdk.client.model.permission.proxy.GrantProxyEntityPermission
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.function.Consumer;
 
-public class ForAuthorizedSubjectApi {
-    private final HttpClient memberVarHttpClient;
+import static pl.akmf.ksef.sdk.api.Url.GRANT_AUTHORIZED_SUBJECT_PERMISSION;
+
+public class ForAuthorizedSubjectApi extends BaseApi {
     private final ObjectMapper memberVarObjectMapper;
     private final String memberVarBaseUri;
     private final Consumer<HttpRequest.Builder> memberVarInterceptor;
     private final Duration memberVarReadTimeout;
-    private final Consumer<HttpResponse<InputStream>> memberVarResponseInterceptor;
 
     public ForAuthorizedSubjectApi(ApiClient apiClient) {
-        memberVarHttpClient = apiClient.getHttpClient();
+        super(apiClient.getHttpClient(), apiClient.getResponseInterceptor());
         memberVarObjectMapper = apiClient.getObjectMapper();
         memberVarBaseUri = apiClient.getBaseUri();
         memberVarInterceptor = apiClient.getRequestInterceptor();
         memberVarReadTimeout = apiClient.getReadTimeout();
-        memberVarResponseInterceptor = apiClient.getResponseInterceptor();
-    }
-
-    protected ApiException getApiException(String operationId, HttpResponse<InputStream> response) throws IOException {
-        String body = response.body() == null ? null : new String(response.body().readAllBytes());
-        String message = formatExceptionMessage(operationId, response.statusCode(), body);
-        return new ApiException(response.statusCode(), message, response.headers(), body);
-    }
-
-    private String formatExceptionMessage(String operationId, int statusCode, String body) {
-        if (body == null || body.isEmpty()) {
-            body = "[no body]";
-        }
-        return operationId + " call failed with: " + statusCode + " - " + body;
-    }
-
-    /**
-     * [mock] Pobranie listy uprawnień o charakterze uprawnień nadanych podmiotom
-     *
-     * @return ApiResponse&lt;Void&gt;
-     * @throws ApiException if fails to make API call
-     */
-    public ApiResponse<Void> apiV2PermissionsAuthorizationsGrantsGet() throws ApiException {
-        HttpRequest.Builder localVarRequestBuilder = apiV2PermissionsAuthorizationsGrantsGetRequestBuilder();
-        try {
-            HttpResponse<InputStream> localVarResponse = memberVarHttpClient.send(
-                    localVarRequestBuilder.build(),
-                    HttpResponse.BodyHandlers.ofInputStream());
-            if (memberVarResponseInterceptor != null) {
-                memberVarResponseInterceptor.accept(localVarResponse);
-            }
-            try {
-                if (localVarResponse.statusCode() / 100 != 2) {
-                    throw getApiException("apiV2PermissionsAuthorizationsGrantsGet", localVarResponse);
-                }
-                return new ApiResponse<>(
-                        localVarResponse.statusCode(),
-                        localVarResponse.headers().map(),
-                        null
-                );
-            } finally {
-                // Drain the InputStream
-                localVarResponse.body().close();
-            }
-        } catch (IOException e) {
-            throw new ApiException(e);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new ApiException(e);
-        }
-    }
-
-    private HttpRequest.Builder apiV2PermissionsAuthorizationsGrantsGetRequestBuilder() {
-
-        HttpRequest.Builder localVarRequestBuilder = HttpRequest.newBuilder();
-
-        String localVarPath = "/api/v2/permissions/authorizations/grants";
-
-        localVarRequestBuilder.uri(URI.create(memberVarBaseUri + localVarPath));
-
-        localVarRequestBuilder.header("Accept", "application/json");
-
-        localVarRequestBuilder.method("GET", HttpRequest.BodyPublishers.noBody());
-        if (memberVarReadTimeout != null) {
-            localVarRequestBuilder.timeout(memberVarReadTimeout);
-        }
-        if (memberVarInterceptor != null) {
-            memberVarInterceptor.accept(localVarRequestBuilder);
-        }
-        return localVarRequestBuilder;
     }
 
     /**
@@ -113,20 +42,13 @@ public class ForAuthorizedSubjectApi {
     public ApiResponse<PermissionsOperationResponse> apiV2PermissionsAuthorizationsGrantsPost(GrantProxyEntityPermissionsRequest entityAuthorizationPermissionsGrantRequest) throws ApiException {
         HttpRequest.Builder localVarRequestBuilder = apiV2PermissionsAuthorizationsGrantsPostRequestBuilder(entityAuthorizationPermissionsGrantRequest);
         try {
-            HttpResponse<InputStream> localVarResponse = memberVarHttpClient.send(
-                    localVarRequestBuilder.build(),
-                    HttpResponse.BodyHandlers.ofInputStream());
-            if (memberVarResponseInterceptor != null) {
-                memberVarResponseInterceptor.accept(localVarResponse);
-            }
-            if (localVarResponse.statusCode() / 100 != 2) {
-                throw getApiException("apiV2PermissionsAuthorizationsGrantsPost", localVarResponse);
-            }
+            HttpResponse<InputStream> localVarResponse = getInputStreamHttpResponse(localVarRequestBuilder, GRANT_AUTHORIZED_SUBJECT_PERMISSION.getOperationId());
+
             return new ApiResponse<>(
                     localVarResponse.statusCode(),
                     localVarResponse.headers().map(),
                     localVarResponse.body() == null ? null : memberVarObjectMapper.readValue(localVarResponse.body(), new TypeReference<>() {
-                    }) // closes the InputStream
+                    })
             );
         } catch (IOException e) {
             throw new ApiException(e);
@@ -140,7 +62,7 @@ public class ForAuthorizedSubjectApi {
 
         HttpRequest.Builder localVarRequestBuilder = HttpRequest.newBuilder();
 
-        String localVarPath = "/api/v2/permissions/authorizations/grants";
+        String localVarPath = GRANT_AUTHORIZED_SUBJECT_PERMISSION.getUrl();
 
         localVarRequestBuilder.uri(URI.create(memberVarBaseUri + localVarPath));
 

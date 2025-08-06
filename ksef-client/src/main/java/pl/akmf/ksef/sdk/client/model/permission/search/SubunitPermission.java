@@ -13,7 +13,6 @@ public class SubunitPermission {
     private String permissionScope;
     private String description;
     private OffsetDateTime startDate;
-    private boolean canDelegate;
 
     SubunitPermission() {
     }
@@ -108,14 +107,6 @@ public class SubunitPermission {
 
     public void setStartDate(OffsetDateTime startDate) {
         this.startDate = startDate;
-    }
-
-    public boolean isCanDelegate() {
-        return canDelegate;
-    }
-
-    public void setCanDelegate(boolean canDelegate) {
-        this.canDelegate = canDelegate;
     }
 }
 

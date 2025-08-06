@@ -10,11 +10,11 @@ public class EntityAuthorizationGrant {
     private String authorizedEntityIdentifierType;
     private String authorizingEntityIdentifier;
     private String authorizingEntityIdentifierType;
-    private String authorizationScope;
+    private EntityAuthorizationScope authorizationScope;
     private String description;
     private OffsetDateTime startDate;
 
-    public EntityAuthorizationGrant(String id, String authorIdentifier, String authorIdentifierType, String authorizedEntityIdentifier, String authorizedEntityIdentifierType, String authorizingEntityIdentifier, String authorizingEntityIdentifierType, String authorizationScope, String description, OffsetDateTime startDate) {
+    public EntityAuthorizationGrant(String id, String authorIdentifier, String authorIdentifierType, String authorizedEntityIdentifier, String authorizedEntityIdentifierType, String authorizingEntityIdentifier, String authorizingEntityIdentifierType, EntityAuthorizationScope authorizationScope, String description, OffsetDateTime startDate) {
         this.id = id;
         this.authorIdentifier = authorIdentifier;
         this.authorIdentifierType = authorIdentifierType;
@@ -86,11 +86,11 @@ public class EntityAuthorizationGrant {
         this.authorizingEntityIdentifierType = authorizingEntityIdentifierType;
     }
 
-    public String getAuthorizationScope() {
+    public EntityAuthorizationScope getAuthorizationScope() {
         return authorizationScope;
     }
 
-    public void setAuthorizationScope(String authorizationScope) {
+    public void setAuthorizationScope(EntityAuthorizationScope authorizationScope) {
         this.authorizationScope = authorizationScope;
     }
 

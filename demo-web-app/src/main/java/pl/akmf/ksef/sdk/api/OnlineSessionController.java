@@ -10,10 +10,11 @@ import pl.akmf.ksef.sdk.api.builders.session.SendInvoiceRequestBuilder;
 import pl.akmf.ksef.sdk.api.services.DefaultCryptographyService;
 import pl.akmf.ksef.sdk.api.services.DefaultKsefClient;
 import pl.akmf.ksef.sdk.client.model.ApiException;
+import pl.akmf.ksef.sdk.client.model.session.EncryptionData;
 import pl.akmf.ksef.sdk.client.model.session.FormCode;
+import pl.akmf.ksef.sdk.client.model.session.SystemCode;
 import pl.akmf.ksef.sdk.client.model.session.online.OpenOnlineSessionResponse;
 import pl.akmf.ksef.sdk.client.model.session.online.SendInvoiceResponse;
-import pl.akmf.ksef.sdk.client.model.session.EncryptionData;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -41,7 +42,7 @@ public class OnlineSessionController {
 
         //stworzenie zapytania
         var request = new OpenOnlineSessionRequestBuilder()
-                .withFormCode(new FormCode("FA (2)","1-0E","FA"))
+                .withFormCode(new FormCode(SystemCode.FA_2, "1-0E", "FA"))
                 .withEncryptionInfo(encryptionData.encryptionInfo())
                 .build();
 
@@ -92,7 +93,7 @@ public class OnlineSessionController {
     /**
      * Zamknięcie sesji interaktywnej
      *
-     * @throws pl.akmf.ksef.sdk.ApiException if fails to make API call
+     * @throws   ApiException if fails to make API call
      */
     @PostMapping(value = "/close-session/{referenceNumber}")
     public void sessionClose(@PathVariable String referenceNumber) throws ApiException {

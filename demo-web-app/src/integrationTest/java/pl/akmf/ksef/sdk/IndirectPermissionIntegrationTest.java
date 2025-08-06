@@ -4,48 +4,57 @@ import jakarta.xml.bind.JAXBException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import pl.akmf.ksef.sdk.api.builders.permission.indirect.GrantIndirectEntityPermissionsRequestBuilder;
-import pl.akmf.ksef.sdk.api.builders.permission.subunit.SubunitPermissionsQueryRequestBuilder;
+import pl.akmf.ksef.sdk.api.builders.permission.person.PersonPermissionsQueryRequestBuilder;
 import pl.akmf.ksef.sdk.client.model.ApiException;
+import pl.akmf.ksef.sdk.client.model.permission.PermissionStatusInfo;
 import pl.akmf.ksef.sdk.client.model.permission.indirect.SubjectIdentifier;
 import pl.akmf.ksef.sdk.client.model.permission.indirect.SubjectIdentifierType;
+import pl.akmf.ksef.sdk.client.model.permission.indirect.TargetIdentifier;
+import pl.akmf.ksef.sdk.client.model.permission.indirect.TargetIdentifierType;
+import pl.akmf.ksef.sdk.client.model.permission.search.PersonPermissionQueryType;
 import pl.akmf.ksef.sdk.client.model.xml.ContextIdentifierTypeEnum;
 import pl.akmf.ksef.sdk.configuration.BaseIntegrationTest;
 
 import java.io.IOException;
 import java.util.List;
 
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.awaitility.Awaitility.await;
 import static pl.akmf.ksef.sdk.client.model.permission.indirect.IndirectPermissionType.INVOICEWRITE;
 
 class IndirectPermissionIntegrationTest extends BaseIntegrationTest {
 
     @Test
-    void indirectPermissionE2EIntegrationTest() throws JAXBException, IOException, InterruptedException, ApiException {
+    void indirectPermissionE2EIntegrationTest() throws JAXBException, IOException, ApiException {
         String contextNip = TestUtils.generateRandomNIP();
         String subjectNip = TestUtils.generateRandomNIP();
-        authWithCustomNip(contextNip, ContextIdentifierTypeEnum.NIP, contextNip);
-
-        var grantReferenceNumber = grantIndirectPermission(subjectNip);
-
-        Thread.sleep(5000);
-
-        checkPermissionStatus(grantReferenceNumber);
+        String targetNip = TestUtils.generateRandomNIP();
         authWithCustomNip(subjectNip, ContextIdentifierTypeEnum.NIP, subjectNip);
 
-        checkGrantedPermission(4);
+        var grantIndirectReferenceNumber = grantIndirectPermission(targetNip, contextNip);
+
+        await().atMost(15, SECONDS)
+                .pollInterval(1, SECONDS)
+                .until(() -> isOperationFinish(grantIndirectReferenceNumber));
+
+        checkGrantedPermission(1);
     }
 
-    private void checkGrantedPermission(int expected) throws ApiException {
-        var request = new SubunitPermissionsQueryRequestBuilder()
+    private String checkGrantedPermission(int expected) throws ApiException {
+        var request = new PersonPermissionsQueryRequestBuilder()
+                .withQueryType(PersonPermissionQueryType.PERMISSION_GRANTED_IN_CURRENT_CONTEXT)
                 .build();
 
-        var response = defaultKsefClient.searchSubunitAdminPermissions(request, 0, 10);
+        var response = defaultKsefClient.searchGrantedPersonPermissions(request, 0, 10);
         Assertions.assertEquals(expected, response.getPermissions().size());
+
+        return response.getPermissions().getFirst().getId();
     }
 
-    private String grantIndirectPermission(String subjectNip) throws ApiException {
+    private String grantIndirectPermission(String targetNip, String contextNip) throws ApiException {
         var request = new GrantIndirectEntityPermissionsRequestBuilder()
-                .withSubjectIdentifier(new SubjectIdentifier(SubjectIdentifierType.NIP, subjectNip))
-                .withTargetIdentifier(null)
+                .withSubjectIdentifier(new SubjectIdentifier(SubjectIdentifierType.NIP, targetNip))
+                .withTargetIdentifier(new TargetIdentifier(TargetIdentifierType.NIP, contextNip))
                 .withPermissions(List.of(INVOICEWRITE))
                 .withDescription("e2e test")
                 .build();
@@ -55,10 +64,8 @@ class IndirectPermissionIntegrationTest extends BaseIntegrationTest {
         return response.getOperationReferenceNumber();
     }
 
-    private void checkPermissionStatus(String referenceNumber) throws ApiException {
-        var status = defaultKsefClient.operations(referenceNumber);
-
-        Assertions.assertNotNull(status);
-        Assertions.assertEquals(200, status.getStatus().getCode());
+    private Boolean isOperationFinish(String referenceNumber) throws ApiException {
+        PermissionStatusInfo operations = defaultKsefClient.permissionOperationStatus(referenceNumber);
+        return operations != null && operations.getStatus().getCode() == 200;
     }
 }

@@ -9,6 +9,7 @@ import pl.akmf.ksef.sdk.client.model.ApiException;
 import pl.akmf.ksef.sdk.client.model.session.EncryptionData;
 import pl.akmf.ksef.sdk.client.model.session.FileMetadata;
 import pl.akmf.ksef.sdk.client.model.session.SessionInvoice;
+import pl.akmf.ksef.sdk.client.model.session.SystemCode;
 import pl.akmf.ksef.sdk.client.model.session.batch.BatchPartSendingInfo;
 import pl.akmf.ksef.sdk.client.model.session.batch.OpenBatchSessionRequest;
 import pl.akmf.ksef.sdk.client.model.xml.ContextIdentifierTypeEnum;
@@ -20,14 +21,19 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.cert.CertificateException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
+
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.awaitility.Awaitility.await;
 
 class BatchIntegrationTest extends BaseIntegrationTest {
     private static final int NUMBER_OF_PARTS = 2;
@@ -36,7 +42,7 @@ class BatchIntegrationTest extends BaseIntegrationTest {
     private static final Path INVOICES_DIR = Paths.get(TMP + "/Invoices");
 
     @Test
-    void batchSessionE2EIntegrationTest() throws JAXBException, IOException, InterruptedException, ApiException {
+    void batchSessionE2EIntegrationTest() throws JAXBException, IOException, InterruptedException, ApiException, CertificateException {
         String contextNip = TestUtils.generateRandomNIP();
         authWithCustomNip(contextNip, ContextIdentifierTypeEnum.NIP, contextNip);
 
@@ -44,7 +50,10 @@ class BatchIntegrationTest extends BaseIntegrationTest {
 
         closeSession(sessionReferenceNumber);
 
-        Thread.sleep(8000);
+
+        await().atMost(30, SECONDS)
+                .pollInterval(2, SECONDS)
+                .until(() -> isBatchSessionStatusReady(sessionReferenceNumber));
 
         var upoReferenceNumber = getBatchSessionStatus(sessionReferenceNumber);
 
@@ -53,6 +62,11 @@ class BatchIntegrationTest extends BaseIntegrationTest {
         getBatchInvoiceAndUpo(sessionReferenceNumber, documents.getFirst().getKsefNumber());
 
         getSessionUpo(sessionReferenceNumber, upoReferenceNumber);
+    }
+
+    private Boolean isBatchSessionStatusReady(String sessionReferenceNumber) throws ApiException {
+        var response = defaultKsefClient.getSessionStatus(sessionReferenceNumber);
+        return response != null && response.getStatus().getCode() == 200;
     }
 
     private void getSessionUpo(String sessionReferenceNumber, String upoReferenceNumber) throws ApiException {
@@ -91,9 +105,9 @@ class BatchIntegrationTest extends BaseIntegrationTest {
         defaultKsefClient.closeBatchSession(referenceNumber);
     }
 
-    private String openBatchSessionAndSendInvoice(String context) throws IOException, ApiException, InterruptedException {
+    private String openBatchSessionAndSendInvoice(String context) throws IOException, ApiException, InterruptedException, CertificateException {
         //when
-        String invoice = new String(BaseIntegrationTest.class.getResourceAsStream("/xml/invoices/sample/invoice-template.xml")
+        String invoice = new String(Objects.requireNonNull(BaseIntegrationTest.class.getResourceAsStream("/xml/invoices/sample/invoice-template.xml"))
                 .readAllBytes(), StandardCharsets.UTF_8);
 
         DefaultCryptographyService cryptographyService = new DefaultCryptographyService(defaultKsefClient);
@@ -156,8 +170,9 @@ class BatchIntegrationTest extends BaseIntegrationTest {
 
         // Build request
         var builder = OpenBatchSessionRequestBuilder.create()
-                .withFormCode("FA (2)", "1-0E", "FA")
-                .withBatchFile(zipMetadata.getFileSize(), zipMetadata.getHashSHA(), false);
+                .withFormCode(SystemCode.FA_2, "1-0E", "FA")
+                .withOfflineMode(false)
+                .withBatchFile(zipMetadata.getFileSize(), zipMetadata.getHashSHA());
 
         for (int i = 0; i < encryptedZipParts.size(); i++) {
             var part = encryptedZipParts.get(i);
@@ -172,7 +187,7 @@ class BatchIntegrationTest extends BaseIntegrationTest {
                 )
                 .build();
 
-        var response = defaultKsefClient.batchOpen(request);
+        var response = defaultKsefClient.openBatchSession(request);
 
         deleteDirectoryRecursively(Paths.get(TMP));
 

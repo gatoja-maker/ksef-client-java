@@ -6,9 +6,13 @@ import pl.akmf.ksef.sdk.client.model.ApiClient;
 import pl.akmf.ksef.sdk.client.model.ApiException;
 import pl.akmf.ksef.sdk.client.model.ApiResponse;
 import pl.akmf.ksef.sdk.client.model.Pair;
+import pl.akmf.ksef.sdk.client.model.session.CommonSessionStatus;
 import pl.akmf.ksef.sdk.client.model.session.SessionInvoice;
 import pl.akmf.ksef.sdk.client.model.session.SessionInvoicesResponse;
 import pl.akmf.ksef.sdk.client.model.session.SessionStatusResponse;
+import pl.akmf.ksef.sdk.client.model.session.SessionType;
+import pl.akmf.ksef.sdk.client.model.session.SessionsQueryRequest;
+import pl.akmf.ksef.sdk.client.model.session.SessionsQueryResponse;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -17,43 +21,34 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.StringJoiner;
 import java.util.function.Consumer;
 
-public class SendStatusAndUpoApi {
-    private final HttpClient memberVarHttpClient;
+import static pl.akmf.ksef.sdk.api.Url.SESSION_INVOICE;
+import static pl.akmf.ksef.sdk.api.Url.SESSION_INVOICE_FAILED;
+import static pl.akmf.ksef.sdk.api.Url.SESSION_INVOICE_GET_BY_REFERENCE_NUMBER;
+import static pl.akmf.ksef.sdk.api.Url.SESSION_INVOICE_UPO_BY_INVOICE_REFERENCE;
+import static pl.akmf.ksef.sdk.api.Url.SESSION_INVOICE_UPO_BY_KSEF;
+import static pl.akmf.ksef.sdk.api.Url.SESSION_LIST;
+import static pl.akmf.ksef.sdk.api.Url.SESSION_STATUS;
+import static pl.akmf.ksef.sdk.api.Url.SESSION_UPO;
+import static pl.akmf.ksef.sdk.client.model.ApiException.getApiException;
+
+public class SendStatusAndUpoApi extends BaseApi {
     private final ObjectMapper memberVarObjectMapper;
     private final String memberVarBaseUri;
     private final Consumer<HttpRequest.Builder> memberVarInterceptor;
     private final Duration memberVarReadTimeout;
-    private final Consumer<HttpResponse<InputStream>> memberVarResponseInterceptor;
-
-    public SendStatusAndUpoApi() {
-        this(new ApiClient());
-    }
 
     public SendStatusAndUpoApi(ApiClient apiClient) {
-        memberVarHttpClient = apiClient.getHttpClient();
+        super(apiClient.getHttpClient(),apiClient.getResponseInterceptor());
         memberVarObjectMapper = apiClient.getObjectMapper();
         memberVarBaseUri = apiClient.getBaseUri();
         memberVarInterceptor = apiClient.getRequestInterceptor();
         memberVarReadTimeout = apiClient.getReadTimeout();
-        memberVarResponseInterceptor = apiClient.getResponseInterceptor();
-    }
-
-    protected ApiException getApiException(String operationId, HttpResponse<InputStream> response) throws IOException {
-        String body = response.body() == null ? null : new String(response.body().readAllBytes());
-        String message = formatExceptionMessage(operationId, response.statusCode(), body);
-        return new ApiException(response.statusCode(), message, response.headers(), body);
-    }
-
-    private String formatExceptionMessage(String operationId, int statusCode, String body) {
-        if (body == null || body.isEmpty()) {
-            body = "[no body]";
-        }
-        return operationId + " call failed with: " + statusCode + " - " + body;
     }
 
     /**
@@ -69,20 +64,13 @@ public class SendStatusAndUpoApi {
     public ApiResponse<SessionInvoicesResponse> apiV2SessionsReferenceNumberInvoicesFailedGet(String referenceNumber, String xContinuationToken, Integer pageSize) throws ApiException {
         HttpRequest.Builder localVarRequestBuilder = apiV2SessionsReferenceNumberInvoicesFailedGetRequestBuilder(referenceNumber, xContinuationToken, pageSize);
         try {
-            HttpResponse<InputStream> localVarResponse = memberVarHttpClient.send(
-                    localVarRequestBuilder.build(),
-                    HttpResponse.BodyHandlers.ofInputStream());
-            if (memberVarResponseInterceptor != null) {
-                memberVarResponseInterceptor.accept(localVarResponse);
-            }
-            if (localVarResponse.statusCode() / 100 != 2) {
-                throw getApiException("apiV2SessionsReferenceNumberInvoicesFailedGet", localVarResponse);
-            }
+            HttpResponse<InputStream> localVarResponse = getInputStreamHttpResponse(localVarRequestBuilder, SESSION_INVOICE_FAILED.getOperationId());
+
             return new ApiResponse<>(
                     localVarResponse.statusCode(),
                     localVarResponse.headers().map(),
                     localVarResponse.body() == null ? null : memberVarObjectMapper.readValue(localVarResponse.body(), new TypeReference<>() {
-                    }) // closes the InputStream
+                    })
             );
         } catch (IOException e) {
             throw new ApiException(e);
@@ -93,19 +81,17 @@ public class SendStatusAndUpoApi {
     }
 
     private HttpRequest.Builder apiV2SessionsReferenceNumberInvoicesFailedGetRequestBuilder(String referenceNumber, String xContinuationToken, Integer pageSize) throws ApiException {
-        // verify the required parameter 'referenceNumber' is set
         if (referenceNumber == null) {
             throw new ApiException(400, "Missing the required parameter 'referenceNumber' when calling apiV2SessionsReferenceNumberInvoicesFailedGet");
         }
 
         HttpRequest.Builder localVarRequestBuilder = HttpRequest.newBuilder();
 
-        String localVarPath = "/api/v2/sessions/{referenceNumber}/invoices/failed"
-                .replace("{referenceNumber}", ApiClient.urlEncode(referenceNumber.toString()));
+        String localVarPath = SESSION_INVOICE_FAILED.getUrl()
+                .replace("{referenceNumber}", ApiClient.urlEncode(referenceNumber));
 
-        List<Pair> localVarQueryParams = new ArrayList<>();
         StringJoiner localVarQueryStringJoiner = new StringJoiner("&");
-        localVarQueryParams.addAll(ApiClient.parameterToPairs("pageSize", pageSize));
+        List<Pair> localVarQueryParams = new ArrayList<>(ApiClient.parameterToPairs("pageSize", pageSize));
 
         if (!localVarQueryParams.isEmpty() || localVarQueryStringJoiner.length() != 0) {
             StringJoiner queryJoiner = new StringJoiner("&");
@@ -119,7 +105,7 @@ public class SendStatusAndUpoApi {
         }
 
         if (xContinuationToken != null) {
-            localVarRequestBuilder.header("x-continuation-token", xContinuationToken.toString());
+            localVarRequestBuilder.header("x-continuation-token", xContinuationToken);
         }
         localVarRequestBuilder.header("Accept", "application/json");
 
@@ -146,20 +132,13 @@ public class SendStatusAndUpoApi {
     public ApiResponse<SessionInvoicesResponse> apiV2SessionsReferenceNumberInvoicesGet(String referenceNumber, Integer pageOffset, Integer pageSize) throws ApiException {
         HttpRequest.Builder localVarRequestBuilder = apiV2SessionsReferenceNumberInvoicesGetRequestBuilder(referenceNumber, pageOffset, pageSize);
         try {
-            HttpResponse<InputStream> localVarResponse = memberVarHttpClient.send(
-                    localVarRequestBuilder.build(),
-                    HttpResponse.BodyHandlers.ofInputStream());
-            if (memberVarResponseInterceptor != null) {
-                memberVarResponseInterceptor.accept(localVarResponse);
-            }
-            if (localVarResponse.statusCode() / 100 != 2) {
-                throw getApiException("apiV2SessionsReferenceNumberInvoicesGet", localVarResponse);
-            }
+            HttpResponse<InputStream> localVarResponse = getInputStreamHttpResponse(localVarRequestBuilder, SESSION_INVOICE.getOperationId());
+
             return new ApiResponse<>(
                     localVarResponse.statusCode(),
                     localVarResponse.headers().map(),
                     localVarResponse.body() == null ? null : memberVarObjectMapper.readValue(localVarResponse.body(), new TypeReference<>() {
-                    }) // closes the InputStream
+                    })
             );
         } catch (IOException e) {
             throw new ApiException(e);
@@ -170,14 +149,13 @@ public class SendStatusAndUpoApi {
     }
 
     private HttpRequest.Builder apiV2SessionsReferenceNumberInvoicesGetRequestBuilder(String referenceNumber, Integer pageOffset, Integer pageSize) throws ApiException {
-        // verify the required parameter 'referenceNumber' is set
         if (referenceNumber == null) {
             throw new ApiException(400, "Missing the required parameter 'referenceNumber' when calling apiV2SessionsReferenceNumberInvoicesGet");
         }
 
         HttpRequest.Builder localVarRequestBuilder = HttpRequest.newBuilder();
 
-        String localVarPath = "/api/v2/sessions/{referenceNumber}/invoices"
+        String localVarPath = SESSION_INVOICE.getUrl()
                 .replace("{referenceNumber}", ApiClient.urlEncode(referenceNumber));
 
         List<Pair> localVarQueryParams = new ArrayList<>();
@@ -220,20 +198,13 @@ public class SendStatusAndUpoApi {
     public ApiResponse<SessionInvoice> apiV2SessionsReferenceNumberInvoicesInvoiceReferenceNumberGet(String referenceNumber, String invoiceReferenceNumber) throws ApiException {
         HttpRequest.Builder localVarRequestBuilder = apiV2SessionsReferenceNumberInvoicesInvoiceReferenceNumberGetRequestBuilder(referenceNumber, invoiceReferenceNumber);
         try {
-            HttpResponse<InputStream> localVarResponse = memberVarHttpClient.send(
-                    localVarRequestBuilder.build(),
-                    HttpResponse.BodyHandlers.ofInputStream());
-            if (memberVarResponseInterceptor != null) {
-                memberVarResponseInterceptor.accept(localVarResponse);
-            }
-            if (localVarResponse.statusCode() / 100 != 2) {
-                throw getApiException("apiV2SessionsReferenceNumberInvoicesInvoiceReferenceNumberGet", localVarResponse);
-            }
+            HttpResponse<InputStream> localVarResponse = getInputStreamHttpResponse(localVarRequestBuilder, SESSION_INVOICE_GET_BY_REFERENCE_NUMBER.getOperationId());
+
             return new ApiResponse<>(
                     localVarResponse.statusCode(),
                     localVarResponse.headers().map(),
                     localVarResponse.body() == null ? null : memberVarObjectMapper.readValue(localVarResponse.body(), new TypeReference<>() {
-                    }) // closes the InputStream
+                    })
             );
         } catch (IOException e) {
             throw new ApiException(e);
@@ -244,18 +215,16 @@ public class SendStatusAndUpoApi {
     }
 
     private HttpRequest.Builder apiV2SessionsReferenceNumberInvoicesInvoiceReferenceNumberGetRequestBuilder(String referenceNumber, String invoiceReferenceNumber) throws ApiException {
-        // verify the required parameter 'referenceNumber' is set
         if (referenceNumber == null) {
             throw new ApiException(400, "Missing the required parameter 'referenceNumber' when calling apiV2SessionsReferenceNumberInvoicesInvoiceReferenceNumberGet");
         }
-        // verify the required parameter 'invoiceReferenceNumber' is set
         if (invoiceReferenceNumber == null) {
             throw new ApiException(400, "Missing the required parameter 'invoiceReferenceNumber' when calling apiV2SessionsReferenceNumberInvoicesInvoiceReferenceNumberGet");
         }
 
         HttpRequest.Builder localVarRequestBuilder = HttpRequest.newBuilder();
 
-        String localVarPath = "/api/v2/sessions/{referenceNumber}/invoices/{invoiceReferenceNumber}"
+        String localVarPath = SESSION_INVOICE_GET_BY_REFERENCE_NUMBER.getUrl()
                 .replace("{referenceNumber}", ApiClient.urlEncode(referenceNumber))
                 .replace("{invoiceReferenceNumber}", ApiClient.urlEncode(invoiceReferenceNumber));
 
@@ -285,19 +254,12 @@ public class SendStatusAndUpoApi {
     public ApiResponse<byte[]> apiV2SessionsReferenceNumberInvoicesInvoiceReferenceNumberUpoGet(String referenceNumber, String invoiceReferenceNumber) throws ApiException {
         HttpRequest.Builder localVarRequestBuilder = apiV2SessionsReferenceNumberInvoicesInvoiceReferenceNumberUpoGetRequestBuilder(referenceNumber, invoiceReferenceNumber);
         try {
-            HttpResponse<InputStream> localVarResponse = memberVarHttpClient.send(
-                    localVarRequestBuilder.build(),
-                    HttpResponse.BodyHandlers.ofInputStream());
-            if (memberVarResponseInterceptor != null) {
-                memberVarResponseInterceptor.accept(localVarResponse);
-            }
-            if (localVarResponse.statusCode() / 100 != 2) {
-                throw getApiException("apiV2SessionsReferenceNumberInvoicesInvoiceReferenceNumberUpoGet", localVarResponse);
-            }
+            HttpResponse<InputStream> localVarResponse = getInputStreamHttpResponse(localVarRequestBuilder, SESSION_INVOICE_UPO_BY_INVOICE_REFERENCE.getOperationId());
+
             return new ApiResponse<>(
                     localVarResponse.statusCode(),
                     localVarResponse.headers().map(),
-                    localVarResponse.body() == null ? null : localVarResponse.body().readAllBytes() // closes the InputStream
+                    localVarResponse.body() == null ? null : localVarResponse.body().readAllBytes()
             );
 
         } catch (IOException e) {
@@ -309,18 +271,16 @@ public class SendStatusAndUpoApi {
     }
 
     private HttpRequest.Builder apiV2SessionsReferenceNumberInvoicesInvoiceReferenceNumberUpoGetRequestBuilder(String referenceNumber, String invoiceReferenceNumber) throws ApiException {
-        // verify the required parameter 'referenceNumber' is set
         if (referenceNumber == null) {
             throw new ApiException(400, "Missing the required parameter 'referenceNumber' when calling apiV2SessionsReferenceNumberInvoicesInvoiceReferenceNumberUpoGet");
         }
-        // verify the required parameter 'invoiceReferenceNumber' is set
         if (invoiceReferenceNumber == null) {
             throw new ApiException(400, "Missing the required parameter 'invoiceReferenceNumber' when calling apiV2SessionsReferenceNumberInvoicesInvoiceReferenceNumberUpoGet");
         }
 
         HttpRequest.Builder localVarRequestBuilder = HttpRequest.newBuilder();
 
-        String localVarPath = "/api/v2/sessions/{referenceNumber}/invoices/{invoiceReferenceNumber}/upo"
+        String localVarPath = SESSION_INVOICE_UPO_BY_INVOICE_REFERENCE.getUrl()
                 .replace("{referenceNumber}", ApiClient.urlEncode(referenceNumber))
                 .replace("{invoiceReferenceNumber}", ApiClient.urlEncode(invoiceReferenceNumber));
 
@@ -350,19 +310,12 @@ public class SendStatusAndUpoApi {
     public ApiResponse<byte[]> apiV2SessionsReferenceNumberInvoicesKsefKsefNumberUpoGet(String referenceNumber, String ksefNumber) throws ApiException {
         HttpRequest.Builder localVarRequestBuilder = apiV2SessionsReferenceNumberInvoicesKsefKsefNumberUpoGetRequestBuilder(referenceNumber, ksefNumber);
         try {
-            HttpResponse<InputStream> localVarResponse = memberVarHttpClient.send(
-                    localVarRequestBuilder.build(),
-                    HttpResponse.BodyHandlers.ofInputStream());
-            if (memberVarResponseInterceptor != null) {
-                memberVarResponseInterceptor.accept(localVarResponse);
-            }
-            if (localVarResponse.statusCode() / 100 != 2) {
-                throw getApiException("apiV2SessionsReferenceNumberInvoicesKsefKsefNumberUpoGet", localVarResponse);
-            }
+            HttpResponse<InputStream> localVarResponse = getInputStreamHttpResponse(localVarRequestBuilder, SESSION_INVOICE_UPO_BY_KSEF.getOperationId());
+
             return new ApiResponse<>(
                     localVarResponse.statusCode(),
                     localVarResponse.headers().map(),
-                    localVarResponse.body() == null ? null : localVarResponse.body().readAllBytes()  // closes the InputStream
+                    localVarResponse.body() == null ? null : localVarResponse.body().readAllBytes()
             );
         } catch (IOException e) {
             throw new ApiException(e);
@@ -373,18 +326,16 @@ public class SendStatusAndUpoApi {
     }
 
     private HttpRequest.Builder apiV2SessionsReferenceNumberInvoicesKsefKsefNumberUpoGetRequestBuilder(String referenceNumber, String ksefNumber) throws ApiException {
-        // verify the required parameter 'referenceNumber' is set
         if (referenceNumber == null) {
             throw new ApiException(400, "Missing the required parameter 'referenceNumber' when calling apiV2SessionsReferenceNumberInvoicesKsefKsefNumberUpoGet");
         }
-        // verify the required parameter 'ksefNumber' is set
         if (ksefNumber == null) {
             throw new ApiException(400, "Missing the required parameter 'ksefNumber' when calling apiV2SessionsReferenceNumberInvoicesKsefKsefNumberUpoGet");
         }
 
         HttpRequest.Builder localVarRequestBuilder = HttpRequest.newBuilder();
 
-        String localVarPath = "/api/v2/sessions/{referenceNumber}/invoices/ksef/{ksefNumber}/upo"
+        String localVarPath = SESSION_INVOICE_UPO_BY_KSEF.getUrl()
                 .replace("{referenceNumber}", ApiClient.urlEncode(referenceNumber))
                 .replace("{ksefNumber}", ApiClient.urlEncode(ksefNumber));
 
@@ -402,7 +353,6 @@ public class SendStatusAndUpoApi {
         return localVarRequestBuilder;
     }
 
-
     /**
      * Pobranie statusu sesji
      * Sprawdza bieżący status sesji o podanym numerze referencyjnym.
@@ -414,20 +364,13 @@ public class SendStatusAndUpoApi {
     public ApiResponse<SessionStatusResponse> apiV2SessionsReferenceNumberGet(String referenceNumber) throws ApiException {
         HttpRequest.Builder localVarRequestBuilder = apiV2SessionsReferenceNumberGetRequestBuilder(referenceNumber);
         try {
-            HttpResponse<InputStream> localVarResponse = memberVarHttpClient.send(
-                    localVarRequestBuilder.build(),
-                    HttpResponse.BodyHandlers.ofInputStream());
-            if (memberVarResponseInterceptor != null) {
-                memberVarResponseInterceptor.accept(localVarResponse);
-            }
-            if (localVarResponse.statusCode() / 100 != 2) {
-                throw getApiException("apiV2SessionsReferenceNumberGet", localVarResponse);
-            }
+            HttpResponse<InputStream> localVarResponse = getInputStreamHttpResponse(localVarRequestBuilder, SESSION_STATUS.getOperationId());
+
             return new ApiResponse<>(
                     localVarResponse.statusCode(),
                     localVarResponse.headers().map(),
                     localVarResponse.body() == null ? null : memberVarObjectMapper.readValue(localVarResponse.body(), new TypeReference<>() {
-                    }) // closes the InputStream
+                    })
             );
         } catch (IOException e) {
             throw new ApiException(e);
@@ -438,14 +381,13 @@ public class SendStatusAndUpoApi {
     }
 
     private HttpRequest.Builder apiV2SessionsReferenceNumberGetRequestBuilder(String referenceNumber) throws ApiException {
-        // verify the required parameter 'referenceNumber' is set
         if (referenceNumber == null) {
             throw new ApiException(400, "Missing the required parameter 'referenceNumber' when calling apiV2SessionsReferenceNumberGet");
         }
 
         HttpRequest.Builder localVarRequestBuilder = HttpRequest.newBuilder();
 
-        String localVarPath = "/api/v2/sessions/{referenceNumber}"
+        String localVarPath = SESSION_STATUS.getUrl()
                 .replace("{referenceNumber}", ApiClient.urlEncode(referenceNumber));
 
         localVarRequestBuilder.uri(URI.create(memberVarBaseUri + localVarPath));
@@ -462,7 +404,6 @@ public class SendStatusAndUpoApi {
         return localVarRequestBuilder;
     }
 
-
     /**
      * Pobranie UPO dla sesji
      * Zwraca XML zawierający zbiorcze UPO dla sesji.
@@ -475,19 +416,12 @@ public class SendStatusAndUpoApi {
     public ApiResponse<byte[]> apiV2SessionsReferenceNumberUpoUpoReferenceNumberGet(String referenceNumber, String upoReferenceNumber) throws ApiException {
         HttpRequest.Builder localVarRequestBuilder = apiV2SessionsReferenceNumberUpoUpoReferenceNumberGetRequestBuilder(referenceNumber, upoReferenceNumber);
         try {
-            HttpResponse<InputStream> localVarResponse = memberVarHttpClient.send(
-                    localVarRequestBuilder.build(),
-                    HttpResponse.BodyHandlers.ofInputStream());
-            if (memberVarResponseInterceptor != null) {
-                memberVarResponseInterceptor.accept(localVarResponse);
-            }
-            if (localVarResponse.statusCode() / 100 != 2) {
-                throw getApiException("apiV2SessionsReferenceNumberUpoUpoReferenceNumberGet", localVarResponse);
-            }
+            HttpResponse<InputStream> localVarResponse = getInputStreamHttpResponse(localVarRequestBuilder, SESSION_UPO.getOperationId());
+
             return new ApiResponse<>(
                     localVarResponse.statusCode(),
                     localVarResponse.headers().map(),
-                    localVarResponse.body() == null ? null : localVarResponse.body().readAllBytes() // closes the InputStream
+                    localVarResponse.body() == null ? null : localVarResponse.body().readAllBytes()
             );
         } catch (IOException e) {
             throw new ApiException(e);
@@ -498,18 +432,16 @@ public class SendStatusAndUpoApi {
     }
 
     private HttpRequest.Builder apiV2SessionsReferenceNumberUpoUpoReferenceNumberGetRequestBuilder(String referenceNumber, String upoReferenceNumber) throws ApiException {
-        // verify the required parameter 'referenceNumber' is set
         if (referenceNumber == null) {
             throw new ApiException(400, "Missing the required parameter 'referenceNumber' when calling apiV2SessionsReferenceNumberUpoUpoReferenceNumberGet");
         }
-        // verify the required parameter 'upoReferenceNumber' is set
         if (upoReferenceNumber == null) {
             throw new ApiException(400, "Missing the required parameter 'upoReferenceNumber' when calling apiV2SessionsReferenceNumberUpoUpoReferenceNumberGet");
         }
 
         HttpRequest.Builder localVarRequestBuilder = HttpRequest.newBuilder();
 
-        String localVarPath = "/api/v2/sessions/{referenceNumber}/upo/{upoReferenceNumber}"
+        String localVarPath = SESSION_UPO.getUrl()
                 .replace("{referenceNumber}", ApiClient.urlEncode(referenceNumber))
                 .replace("{upoReferenceNumber}", ApiClient.urlEncode(upoReferenceNumber));
 
@@ -527,4 +459,96 @@ public class SendStatusAndUpoApi {
         return localVarRequestBuilder;
     }
 
+    /**
+     * Pobranie listy sesji
+     * Zwraca listę sesji spełniających podane kryteria wyszukiwania.
+     *
+     * @param request enkapsulowane wszystkie pola requesta
+     * @param pageSize page size
+     * @param continuationToken  continuation token
+     * @return ApiResponse&lt;SessionsQueryResponse&gt;
+     * @throws ApiException if fails to make API call
+     */
+    public ApiResponse<SessionsQueryResponse> apiV2SessionsGet(SessionsQueryRequest request, Integer pageSize, String continuationToken) throws ApiException {
+        HttpRequest.Builder localVarRequestBuilder = apiV2SessionsGetRequestBuilder(request.getSessionType(), pageSize, request.getReferenceNumber(), request.getDateCreatedFrom(), request.getDateCreatedTo(), request.getDateClosedFrom(), request.getDateClosedTo(), request.getDateModifiedFrom(), request.getDateModifiedTo(), request.getStatuses(), continuationToken);
+        try {
+            HttpResponse<InputStream> localVarResponse = getInputStreamHttpResponse(localVarRequestBuilder, SESSION_LIST.getOperationId());
+            return new ApiResponse<>(
+                    localVarResponse.statusCode(),
+                    localVarResponse.headers().map(),
+                    localVarResponse.body() == null ? null : memberVarObjectMapper.readValue(localVarResponse.body(), new TypeReference<>() {
+                    }) // closes the InputStream
+            );
+
+        } catch (IOException e) {
+            throw new ApiException(e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new ApiException(e);
+        }
+    }
+
+    /**
+     *
+     * @param sessionType        Typ sesji. | Wartość | Opis | | --- | --- | | Online | Wysyłka interaktywna (pojedyncze faktury). | | Batch | Wysyłka wsadowa (paczka faktur). |  (required)
+     * @param pageSize           Rozmiar strony. (optional)
+     * @param referenceNumber    Numer referencyjny sesji. (optional)
+     * @param dateCreatedFrom    Data utworzenia sesji (od). (optional)
+     * @param dateCreatedTo      Data utworzenia sesji (do). (optional)
+     * @param dateClosedFrom     Data zamknięcia sesji (od). (optional)
+     * @param dateClosedTo       Data zamknięcia sesji (do). (optional)
+     * @param dateModifiedFrom   Data ostatniej aktywności (wysyłka faktury lub zmiana statusu) w ramach sesji (od). (optional)
+     * @param dateModifiedTo     Data ostatniej aktywności (wysyłka faktury lub zmiana statusu) w ramach sesji (do). (optional)
+     * @param statuses           Statusy sesji. | Wartość | Opis | | --- | --- | | Succeeded | Sesja przetworzona poprawnie.            W trakcie przetwarzania sesji nie wystąpiły żadne błędy, ale część faktur nadal mogła zostać odrzucona. | | InProgress | Sesja aktywna. | | Failed | Sesja nie przetworzona z powodu błędów.            Na etapie rozpoczynania lub kończenia sesji wystąpiły błędy, które nie pozwoliły na jej poprawne przetworzenie. |  (optional)
+     * @param xContinuationToken Token służący do pobrania kolejnej strony wyników. (optional)
+     * @throws ApiException if fails to make API call
+     */
+    private HttpRequest.Builder apiV2SessionsGetRequestBuilder(SessionType sessionType, Integer pageSize, String referenceNumber, OffsetDateTime dateCreatedFrom, OffsetDateTime dateCreatedTo, OffsetDateTime dateClosedFrom, OffsetDateTime dateClosedTo, OffsetDateTime dateModifiedFrom, OffsetDateTime dateModifiedTo, List<CommonSessionStatus> statuses, String xContinuationToken) throws ApiException {
+        // verify the required parameter 'sessionType' is set
+        if (sessionType == null) {
+            throw new ApiException(400, "Missing the required parameter 'sessionType' when calling apiV2SessionsGet");
+        }
+
+        HttpRequest.Builder localVarRequestBuilder = HttpRequest.newBuilder();
+
+        String localVarPath = SESSION_LIST.getUrl();
+
+        List<Pair> localVarQueryParams = new ArrayList<>();
+        StringJoiner localVarQueryStringJoiner = new StringJoiner("&");
+        localVarQueryParams.addAll(ApiClient.parameterToPairs("pageSize", pageSize));
+        localVarQueryParams.addAll(ApiClient.parameterToPairs("sessionType", sessionType));
+        localVarQueryParams.addAll(ApiClient.parameterToPairs("referenceNumber", referenceNumber));
+        localVarQueryParams.addAll(ApiClient.parameterToPairs("dateCreatedFrom", dateCreatedFrom));
+        localVarQueryParams.addAll(ApiClient.parameterToPairs("dateCreatedTo", dateCreatedTo));
+        localVarQueryParams.addAll(ApiClient.parameterToPairs("dateClosedFrom", dateClosedFrom));
+        localVarQueryParams.addAll(ApiClient.parameterToPairs("dateClosedTo", dateClosedTo));
+        localVarQueryParams.addAll(ApiClient.parameterToPairs("dateModifiedFrom", dateModifiedFrom));
+        localVarQueryParams.addAll(ApiClient.parameterToPairs("dateModifiedTo", dateModifiedTo));
+        localVarQueryParams.addAll(ApiClient.parameterToPairs("multi", "statuses", statuses));
+
+        if (!localVarQueryParams.isEmpty() || localVarQueryStringJoiner.length() != 0) {
+            StringJoiner queryJoiner = new StringJoiner("&");
+            localVarQueryParams.forEach(p -> queryJoiner.add(p.getName() + '=' + p.getValue()));
+            if (localVarQueryStringJoiner.length() != 0) {
+                queryJoiner.add(localVarQueryStringJoiner.toString());
+            }
+            localVarRequestBuilder.uri(URI.create(memberVarBaseUri + localVarPath + '?' + queryJoiner.toString()));
+        } else {
+            localVarRequestBuilder.uri(URI.create(memberVarBaseUri + localVarPath));
+        }
+
+        if (xContinuationToken != null) {
+            localVarRequestBuilder.header("x-continuation-token", xContinuationToken.toString());
+        }
+        localVarRequestBuilder.header("Accept", "application/json");
+
+        localVarRequestBuilder.method("GET", HttpRequest.BodyPublishers.noBody());
+        if (memberVarReadTimeout != null) {
+            localVarRequestBuilder.timeout(memberVarReadTimeout);
+        }
+        if (memberVarInterceptor != null) {
+            memberVarInterceptor.accept(localVarRequestBuilder);
+        }
+        return localVarRequestBuilder;
+    }
 }

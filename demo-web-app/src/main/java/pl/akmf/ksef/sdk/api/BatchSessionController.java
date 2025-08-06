@@ -14,6 +14,7 @@ import pl.akmf.ksef.sdk.api.services.DefaultKsefClient;
 import pl.akmf.ksef.sdk.client.model.ApiException;
 import pl.akmf.ksef.sdk.client.model.session.EncryptionData;
 import pl.akmf.ksef.sdk.client.model.session.FileMetadata;
+import pl.akmf.ksef.sdk.client.model.session.SystemCode;
 import pl.akmf.ksef.sdk.client.model.session.batch.BatchPartSendingInfo;
 import pl.akmf.ksef.sdk.client.model.session.batch.OpenBatchSessionRequest;
 
@@ -122,8 +123,9 @@ public class BatchSessionController {
 
         // Build request
         var builder = OpenBatchSessionRequestBuilder.create()
-                .withFormCode("FA (2)", "1-0E", "FA")
-                .withBatchFile(zipMetadata.getFileSize(), zipMetadata.getHashSHA(), false);
+                .withFormCode( SystemCode.FA_2, "1-0E", "FA")
+                .withOfflineMode(false)
+                .withBatchFile(zipMetadata.getFileSize(), zipMetadata.getHashSHA());
 
         for (int i = 0; i < encryptedZipParts.size(); i++) {
             var part = encryptedZipParts.get(i);
@@ -138,7 +140,7 @@ public class BatchSessionController {
                 )
                 .build();
 
-        var response = ksefClient.batchOpen(request);
+        var response = ksefClient.openBatchSession(request);
         log.info("batch session opened " + response);
         ksefClient.sendBatchParts(response, encryptedZipParts);
         log.info("all parts send");

@@ -33,7 +33,7 @@ public class InvoicesController {
 
     @PostMapping("/invoices/metadata")
     QueryInvoicesReponse getInvoiceMetadata(@RequestParam Integer pageOffset, @RequestParam  Integer pageSize, @RequestBody InvoicesQueryRequest request) throws ApiException {
-        return ksefClient.getInvoiceMetadane(pageOffset, pageSize, request);
+        return ksefClient.queryInvoices(pageOffset, pageSize, request);
     }
 
     @PostMapping("/invoices/query/async")

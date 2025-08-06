@@ -6,8 +6,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import pl.akmf.ksef.sdk.client.model.ApiClient;
 import pl.akmf.ksef.sdk.client.model.ApiException;
 import pl.akmf.ksef.sdk.client.model.ApiResponse;
+import pl.akmf.ksef.sdk.client.model.Pair;
 import pl.akmf.ksef.sdk.client.model.auth.AuthKsefTokenRequest;
-import pl.akmf.ksef.sdk.client.model.auth.AuthStatus;
 import pl.akmf.ksef.sdk.client.model.auth.AuthenticationChallengeResponse;
 import pl.akmf.ksef.sdk.client.model.auth.AuthenticationInitResponse;
 import pl.akmf.ksef.sdk.client.model.auth.AuthenticationOperationStatusResponse;
@@ -20,37 +20,34 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.StringJoiner;
 import java.util.function.Consumer;
 
-public class AuthenticationApi {
-    private final HttpClient memberVarHttpClient;
+import static pl.akmf.ksef.sdk.api.Url.AUTH_CHALLENGE;
+import static pl.akmf.ksef.sdk.api.Url.AUTH_KSEF_TOKEN;
+import static pl.akmf.ksef.sdk.api.Url.AUTH_TOKEN_REEDEM;
+import static pl.akmf.ksef.sdk.api.Url.AUTH_TOKEN_SIGNATURE;
+import static pl.akmf.ksef.sdk.api.Url.AUTH_TOKEN_STATUS;
+import static pl.akmf.ksef.sdk.api.Url.JWT_TOKEN_REFRESH;
+import static pl.akmf.ksef.sdk.api.Url.JWT_TOKEN_REVOKE;
+import static pl.akmf.ksef.sdk.client.model.ApiException.getApiException;
+
+public class AuthenticationApi extends BaseApi {
     private final ObjectMapper memberVarObjectMapper;
     private final String memberVarBaseUri;
     private final Consumer<HttpRequest.Builder> memberVarInterceptor;
     private final Duration memberVarReadTimeout;
-    private final Consumer<HttpResponse<InputStream>> memberVarResponseInterceptor;
 
 
     public AuthenticationApi(ApiClient apiClient) {
-        memberVarHttpClient = apiClient.getHttpClient();
+        super(apiClient.getHttpClient(),apiClient.getResponseInterceptor());
         memberVarObjectMapper = apiClient.getObjectMapper();
         memberVarBaseUri = apiClient.getBaseUri();
         memberVarInterceptor = apiClient.getRequestInterceptor();
         memberVarReadTimeout = apiClient.getReadTimeout();
-        memberVarResponseInterceptor = apiClient.getResponseInterceptor();
-    }
-
-    protected ApiException getApiException(String operationId, HttpResponse<InputStream> response) throws IOException {
-        String body = response.body() == null ? null : new String(response.body().readAllBytes());
-        String message = formatExceptionMessage(operationId, response.statusCode(), body);
-        return new ApiException(response.statusCode(), message, response.headers(), body);
-    }
-
-    private String formatExceptionMessage(String operationId, int statusCode, String body) {
-        if (body == null || body.isEmpty()) {
-            body = "[no body]";
-        }
-        return operationId + " call failed with: " + statusCode + " - " + body;
     }
 
     /**
@@ -63,20 +60,13 @@ public class AuthenticationApi {
     public ApiResponse<AuthenticationChallengeResponse> apiV2AuthChallengePostWithHttpInfo() throws ApiException {
         HttpRequest.Builder localVarRequestBuilder = apiV2AuthChallengePostRequestBuilder();
         try {
-            HttpResponse<InputStream> localVarResponse = memberVarHttpClient.send(
-                    localVarRequestBuilder.build(),
-                    HttpResponse.BodyHandlers.ofInputStream());
-            if (memberVarResponseInterceptor != null) {
-                memberVarResponseInterceptor.accept(localVarResponse);
-            }
-            if (localVarResponse.statusCode() / 100 != 2) {
-                throw getApiException("apiV2AuthChallengePost", localVarResponse);
-            }
+            HttpResponse<InputStream> localVarResponse = getInputStreamHttpResponse(localVarRequestBuilder, AUTH_CHALLENGE.getOperationId());
+
             return new ApiResponse<>(
                     localVarResponse.statusCode(),
                     localVarResponse.headers().map(),
                     localVarResponse.body() == null ? null : memberVarObjectMapper.readValue(localVarResponse.body(), new TypeReference<>() {
-                    }) // closes the InputStream
+                    })
             );
         } catch (IOException e) {
             throw new ApiException(e);
@@ -90,11 +80,10 @@ public class AuthenticationApi {
 
         HttpRequest.Builder localVarRequestBuilder = HttpRequest.newBuilder();
 
-        String localVarPath = "/api/v2/auth/challenge";
+        String localVarPath = AUTH_CHALLENGE.getUrl();
 
         localVarRequestBuilder.uri(URI.create(memberVarBaseUri + localVarPath));
         localVarRequestBuilder.method("POST", HttpRequest.BodyPublishers.noBody());
-
         localVarRequestBuilder.header("Content-Type", "application/json");
         localVarRequestBuilder.header("Accept", "application/json");
 
@@ -108,7 +97,7 @@ public class AuthenticationApi {
     }
 
     /**
-     * [Mock] Unieważnienie tokena autoryzacyjnego
+     * Unieważnienie tokena autoryzacyjnego
      * Unieważnia aktualny (przekazany w nagłówku wywołania tej metody) token.
      * Po unieważnieniu tokena nie będzie można za jego pomocą wykonywać żadnych operacji.
      *
@@ -118,25 +107,13 @@ public class AuthenticationApi {
     public ApiResponse<Void> apiV2AuthTokenDeleteWithHttpInfo() throws ApiException {
         HttpRequest.Builder localVarRequestBuilder = apiV2AuthTokenDeleteRequestBuilder();
         try {
-            HttpResponse<InputStream> localVarResponse = memberVarHttpClient.send(
-                    localVarRequestBuilder.build(),
-                    HttpResponse.BodyHandlers.ofInputStream());
-            if (memberVarResponseInterceptor != null) {
-                memberVarResponseInterceptor.accept(localVarResponse);
-            }
-            try {
-                if (localVarResponse.statusCode() / 100 != 2) {
-                    throw getApiException("apiV2AuthTokenDelete", localVarResponse);
-                }
-                return new ApiResponse<>(
-                        localVarResponse.statusCode(),
-                        localVarResponse.headers().map(),
-                        null
-                );
-            } finally {
-                // Drain the InputStream
-                localVarResponse.body().close();
-            }
+            HttpResponse<InputStream> localVarResponse = getInputStreamHttpResponse(localVarRequestBuilder, JWT_TOKEN_REVOKE.getOperationId());
+
+            return new ApiResponse<>(
+                    localVarResponse.statusCode(),
+                    localVarResponse.headers().map(),
+                    null
+            );
         } catch (IOException e) {
             throw new ApiException(e);
         } catch (InterruptedException e) {
@@ -149,7 +126,7 @@ public class AuthenticationApi {
 
         HttpRequest.Builder localVarRequestBuilder = HttpRequest.newBuilder();
 
-        String localVarPath = "/api/v2/auth/token";
+        String localVarPath = JWT_TOKEN_REVOKE.getUrl();
 
         localVarRequestBuilder.uri(URI.create(memberVarBaseUri + localVarPath));
 
@@ -173,20 +150,13 @@ public class AuthenticationApi {
     public ApiResponse<AuthenticationTokenRefreshResponse> apiV2AuthTokenRefreshPostWithHttpInfo() throws ApiException {
         HttpRequest.Builder localVarRequestBuilder = apiV2AuthTokenRefreshPostRequestBuilder();
         try {
-            HttpResponse<InputStream> localVarResponse = memberVarHttpClient.send(
-                    localVarRequestBuilder.build(),
-                    HttpResponse.BodyHandlers.ofInputStream());
-            if (memberVarResponseInterceptor != null) {
-                memberVarResponseInterceptor.accept(localVarResponse);
-            }
-            if (localVarResponse.statusCode() / 100 != 2) {
-                throw getApiException("apiV2AuthTokenRefreshPost", localVarResponse);
-            }
+            HttpResponse<InputStream> localVarResponse = getInputStreamHttpResponse(localVarRequestBuilder, JWT_TOKEN_REFRESH.getOperationId());
+
             return new ApiResponse<>(
                     localVarResponse.statusCode(),
                     localVarResponse.headers().map(),
                     localVarResponse.body() == null ? null : memberVarObjectMapper.readValue(localVarResponse.body(), new TypeReference<>() {
-                    }) // closes the InputStream
+                    })
             );
         } catch (IOException e) {
             throw new ApiException(e);
@@ -200,7 +170,7 @@ public class AuthenticationApi {
 
         HttpRequest.Builder localVarRequestBuilder = HttpRequest.newBuilder();
 
-        String localVarPath = "/api/v2/auth/token/refresh";
+        String localVarPath = JWT_TOKEN_REFRESH.getUrl();
 
         localVarRequestBuilder.uri(URI.create(memberVarBaseUri + localVarPath));
 
@@ -224,23 +194,16 @@ public class AuthenticationApi {
      * @return ApiResponse&lt;AuthenticationInitResponse&gt;
      * @throws ApiException if fails to make API call
      */
-    public ApiResponse<AuthenticationInitResponse> apiV2AuthTokenSignaturePostWithHttpInfo(String body) throws ApiException {
-        HttpRequest.Builder localVarRequestBuilder = apiV2AuthTokenSignaturePostRequestBuilder(body);
+    public ApiResponse<AuthenticationInitResponse> apiV2AuthTokenSignaturePostWithHttpInfo(String body, boolean verifyCertificateChain) throws ApiException {
+        HttpRequest.Builder localVarRequestBuilder = apiV2AuthTokenSignaturePostRequestBuilder(body, verifyCertificateChain);
         try {
-            HttpResponse<InputStream> localVarResponse = memberVarHttpClient.send(
-                    localVarRequestBuilder.build(),
-                    HttpResponse.BodyHandlers.ofInputStream());
-            if (memberVarResponseInterceptor != null) {
-                memberVarResponseInterceptor.accept(localVarResponse);
-            }
-            if (localVarResponse.statusCode() / 100 != 2) {
-                throw getApiException("apiV2AuthTokenSignaturePost", localVarResponse);
-            }
+            HttpResponse<InputStream> localVarResponse = getInputStreamHttpResponse(localVarRequestBuilder, AUTH_TOKEN_SIGNATURE.getOperationId());
+
             return new ApiResponse<>(
                     localVarResponse.statusCode(),
                     localVarResponse.headers().map(),
                     localVarResponse.body() == null ? null : memberVarObjectMapper.readValue(localVarResponse.body(), new TypeReference<>() {
-                    }) // closes the InputStream
+                    })
             );
         } catch (IOException e) {
             throw new ApiException(e);
@@ -250,17 +213,29 @@ public class AuthenticationApi {
         }
     }
 
-    private HttpRequest.Builder apiV2AuthTokenSignaturePostRequestBuilder(String body) throws ApiException {
-        // verify the required parameter 'body' is set
+    private HttpRequest.Builder apiV2AuthTokenSignaturePostRequestBuilder(String body, boolean verifyCertificateChain) throws ApiException {
         if (body == null) {
             throw new ApiException(400, "Missing the required parameter 'body' when calling apiV2AuthTokenSignaturePost");
         }
 
         HttpRequest.Builder localVarRequestBuilder = HttpRequest.newBuilder();
 
-        String localVarPath = "/api/v2/auth/xades-signature";
+        String localVarPath = AUTH_TOKEN_SIGNATURE.getUrl();
 
-        localVarRequestBuilder.uri(URI.create(memberVarBaseUri + localVarPath));
+        List<Pair> localVarQueryParams = new ArrayList<>();
+        StringJoiner localVarQueryStringJoiner = new StringJoiner("&");
+        localVarQueryParams.addAll(ApiClient.parameterToPairs("verifyCertificateChain", verifyCertificateChain));
+
+        if (!localVarQueryParams.isEmpty() || localVarQueryStringJoiner.length() != 0) {
+            StringJoiner queryJoiner = new StringJoiner("&");
+            localVarQueryParams.forEach(p -> queryJoiner.add(p.getName() + '=' + p.getValue()));
+            if (localVarQueryStringJoiner.length() != 0) {
+                queryJoiner.add(localVarQueryStringJoiner.toString());
+            }
+            localVarRequestBuilder.uri(URI.create(memberVarBaseUri + localVarPath + '?' + queryJoiner.toString()));
+        } else {
+            localVarRequestBuilder.uri(URI.create(memberVarBaseUri + localVarPath));
+        }
 
         localVarRequestBuilder.header("Content-Type", "application/xml");
         localVarRequestBuilder.header("Accept", "application/json");
@@ -286,20 +261,12 @@ public class AuthenticationApi {
     public ApiResponse<AuthenticationInitResponse> apiV2AuthTokeKSeFPostWithHttpInfo(AuthKsefTokenRequest body) throws ApiException {
         HttpRequest.Builder localVarRequestBuilder = apiV2AuthTokenKSeFPostRequestBuilder(body);
         try {
-            HttpResponse<InputStream> localVarResponse = memberVarHttpClient.send(
-                    localVarRequestBuilder.build(),
-                    HttpResponse.BodyHandlers.ofInputStream());
-            if (memberVarResponseInterceptor != null) {
-                memberVarResponseInterceptor.accept(localVarResponse);
-            }
-            if (localVarResponse.statusCode() / 100 != 2) {
-                throw getApiException("apiV2AuthTokenSignaturePost", localVarResponse);
-            }
+            HttpResponse<InputStream> localVarResponse = getInputStreamHttpResponse(localVarRequestBuilder, AUTH_KSEF_TOKEN.getOperationId());
             return new ApiResponse<>(
                     localVarResponse.statusCode(),
                     localVarResponse.headers().map(),
                     localVarResponse.body() == null ? null : memberVarObjectMapper.readValue(localVarResponse.body(), new TypeReference<>() {
-                    }) // closes the InputStream
+                    })
             );
         } catch (IOException e) {
             throw new ApiException(e);
@@ -313,7 +280,7 @@ public class AuthenticationApi {
 
         HttpRequest.Builder localVarRequestBuilder = HttpRequest.newBuilder();
 
-        String localVarPath = "/api/v2/auth/ksef-token";
+        String localVarPath = AUTH_KSEF_TOKEN.getUrl();
 
         localVarRequestBuilder.uri(URI.create(memberVarBaseUri + localVarPath));
 
@@ -344,23 +311,16 @@ public class AuthenticationApi {
      * @return ApiResponse&lt;AuthenticationOperationStatusResponse&gt;
      * @throws ApiException if fails to make API call
      */
-    public ApiResponse<AuthStatus> apiV2AuthTokenTokenReferenceNumberGetWithHttpInfo(String referenceNumber) throws ApiException {
+    public ApiResponse<pl.akmf.ksef.sdk.client.model.session.AuthenticationOperationStatusResponse> apiV2AuthTokenTokenReferenceNumberGetWithHttpInfo(String referenceNumber) throws ApiException {
         HttpRequest.Builder localVarRequestBuilder = apiV2AuthTokenTokenReferenceNumberGetRequestBuilder(referenceNumber);
         try {
-            HttpResponse<InputStream> localVarResponse = memberVarHttpClient.send(
-                    localVarRequestBuilder.build(),
-                    HttpResponse.BodyHandlers.ofInputStream());
-            if (memberVarResponseInterceptor != null) {
-                memberVarResponseInterceptor.accept(localVarResponse);
-            }
-            if (localVarResponse.statusCode() / 100 != 2) {
-                throw getApiException("apiV2AuthTokenTokenReferenceNumberGet", localVarResponse);
-            }
+            HttpResponse<InputStream> localVarResponse = getInputStreamHttpResponse(localVarRequestBuilder, AUTH_TOKEN_STATUS.getOperationId());
+
             return new ApiResponse<>(
                     localVarResponse.statusCode(),
                     localVarResponse.headers().map(),
                     localVarResponse.body() == null ? null : memberVarObjectMapper.readValue(localVarResponse.body(), new TypeReference<>() {
-                    }) // closes the InputStream
+                    })
             );
         } catch (IOException e) {
             throw new ApiException(e);
@@ -371,14 +331,13 @@ public class AuthenticationApi {
     }
 
     private HttpRequest.Builder apiV2AuthTokenTokenReferenceNumberGetRequestBuilder(String referenceNumber) throws ApiException {
-        // verify the required parameter 'tokenReferenceNumber' is set
         if (referenceNumber == null) {
             throw new ApiException(400, "Missing the required parameter 'tokenReferenceNumber' when calling apiV2AuthTokenTokenReferenceNumberGet");
         }
 
         HttpRequest.Builder localVarRequestBuilder = HttpRequest.newBuilder();
 
-        String localVarPath = "/api/v2/auth/{referenceNumber}"
+        String localVarPath = AUTH_TOKEN_STATUS.getUrl()
                 .replace("{referenceNumber}", ApiClient.urlEncode(referenceNumber));
 
         localVarRequestBuilder.uri(URI.create(memberVarBaseUri + localVarPath));
@@ -406,20 +365,13 @@ public class AuthenticationApi {
     public ApiResponse<AuthenticationOperationStatusResponse> apiV2AuthRedeemTokenPost() throws ApiException {
         HttpRequest.Builder localVarRequestBuilder = apiV2AuthapiV2AuthRedeemTokenPostRequestBuilder();
         try {
-            HttpResponse<InputStream> localVarResponse = memberVarHttpClient.send(
-                    localVarRequestBuilder.build(),
-                    HttpResponse.BodyHandlers.ofInputStream());
-            if (memberVarResponseInterceptor != null) {
-                memberVarResponseInterceptor.accept(localVarResponse);
-            }
-            if (localVarResponse.statusCode() / 100 != 2) {
-                throw getApiException("apiV2AuthTokenTokenReferenceNumberGet", localVarResponse);
-            }
+            HttpResponse<InputStream> localVarResponse = getInputStreamHttpResponse(localVarRequestBuilder, AUTH_TOKEN_REEDEM.getOperationId());
+
             return new ApiResponse<>(
                     localVarResponse.statusCode(),
                     localVarResponse.headers().map(),
                     localVarResponse.body() == null ? null : memberVarObjectMapper.readValue(localVarResponse.body(), new TypeReference<>() {
-                    }) // closes the InputStream
+                    })
             );
         } catch (IOException e) {
             throw new ApiException(e);
@@ -433,7 +385,7 @@ public class AuthenticationApi {
 
         HttpRequest.Builder localVarRequestBuilder = HttpRequest.newBuilder();
 
-        String localVarPath = "/api/v2/auth/token/redeem";
+        String localVarPath = AUTH_TOKEN_REEDEM.getUrl();
 
         localVarRequestBuilder.uri(URI.create(memberVarBaseUri + localVarPath));
 

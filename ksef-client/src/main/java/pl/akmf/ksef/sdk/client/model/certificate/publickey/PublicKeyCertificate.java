@@ -1,59 +1,48 @@
-
-
 package pl.akmf.ksef.sdk.client.model.certificate.publickey;
-
-import org.openapitools.jackson.nullable.JsonNullable;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 
-/**
- * PublicKeyCertificate
- */
 public class PublicKeyCertificate {
-  private String certificatePem;
+    private String certificatePem;
+    private OffsetDateTime validFrom;
+    private OffsetDateTime validTo;
+    private List<PublicKeyCertificateUsage> usage = new ArrayList<>();
 
-  private OffsetDateTime validFrom;
+    public PublicKeyCertificate() {
+    }
 
-  private OffsetDateTime validTo ;
+    public String getCertificatePem() {
+        return certificatePem;
+    }
 
-  private List<PublicKeyCertificateUsage> usage = new ArrayList<>();
+    public void setCertificatePem(String certificatePem) {
+        this.certificatePem = certificatePem;
+    }
 
-  public PublicKeyCertificate() { 
-  }
+    public OffsetDateTime getValidFrom() {
+        return validFrom;
+    }
 
-  public String getCertificatePem() {
-    return certificatePem;
-  }
+    public void setValidFrom(OffsetDateTime validFrom) {
+        this.validFrom = validFrom;
+    }
 
-  public void setCertificatePem(String certificatePem) {
-    this.certificatePem = certificatePem;
-  }
+    public OffsetDateTime getValidTo() {
+        return validTo;
+    }
 
-  public OffsetDateTime getValidFrom() {
-    return validFrom;
-  }
+    public void setValidTo(OffsetDateTime validTo) {
+        this.validTo = validTo;
+    }
 
-  public void setValidFrom(OffsetDateTime validFrom) {
-    this.validFrom = validFrom;
-  }
+    public List<PublicKeyCertificateUsage> getUsage() {
+        return usage;
+    }
 
-  public OffsetDateTime getValidTo() {
-    return validTo;
-  }
-
-  public void setValidTo(OffsetDateTime validTo) {
-    this.validTo = validTo;
-  }
-
-  public List<PublicKeyCertificateUsage> getUsage() {
-    return usage;
-  }
-
-  public void setUsage(List<PublicKeyCertificateUsage> usage) {
-    this.usage = usage;
-  }
+    public void setUsage(List<PublicKeyCertificateUsage> usage) {
+        this.usage = usage;
+    }
 }
-

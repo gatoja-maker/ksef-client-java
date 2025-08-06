@@ -53,7 +53,7 @@ public class SessionController {
     @GetMapping("/failed-invoices")
     public ResponseEntity<SessionInvoicesResponse> getFailedInvoicesAsync(
             @RequestParam String referenceNumber, @RequestParam Integer pageSize) throws ApiException {
-        return ResponseEntity.ok(ksefClient.getSessionFailedInvoices(referenceNumber, pageSize));
+        return ResponseEntity.ok(ksefClient.getSessionFailedInvoices(referenceNumber,null , pageSize));
     }
 
     @GetMapping("/invoice-status")

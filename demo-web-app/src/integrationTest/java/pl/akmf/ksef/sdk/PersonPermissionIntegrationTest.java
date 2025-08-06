@@ -6,41 +6,74 @@ import org.junit.jupiter.api.Test;
 import pl.akmf.ksef.sdk.api.builders.permission.person.GrantPersonPermissionsRequestBuilder;
 import pl.akmf.ksef.sdk.api.builders.permission.person.PersonPermissionsQueryRequestBuilder;
 import pl.akmf.ksef.sdk.client.model.ApiException;
+import pl.akmf.ksef.sdk.client.model.permission.PermissionStatusInfo;
 import pl.akmf.ksef.sdk.client.model.permission.person.PersonPermissionType;
 import pl.akmf.ksef.sdk.client.model.permission.person.PersonPermissionsSubjectIdentifier;
 import pl.akmf.ksef.sdk.client.model.permission.person.PersonPermissionsSubjectIdentifierType;
+import pl.akmf.ksef.sdk.client.model.permission.search.PersonPermission;
 import pl.akmf.ksef.sdk.client.model.permission.search.PersonPermissionsAuthorizedIdentifier;
 import pl.akmf.ksef.sdk.client.model.permission.search.PersonPermissionsAuthorizedIdentifierType;
 import pl.akmf.ksef.sdk.client.model.xml.ContextIdentifierTypeEnum;
 import pl.akmf.ksef.sdk.configuration.BaseIntegrationTest;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
+
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.awaitility.Awaitility.await;
 
 class PersonPermissionIntegrationTest extends BaseIntegrationTest {
 
     @Test
-    void personPermissionE2EIntegrationTest() throws JAXBException, IOException, InterruptedException, ApiException {
+    void personPermissionE2EIntegrationTest() throws JAXBException, IOException, ApiException {
         String contextNip = TestUtils.generateRandomNIP();
         String subjectNip = TestUtils.generateRandomNIP();
         authWithCustomNip(contextNip, ContextIdentifierTypeEnum.NIP, contextNip);
 
         var grantReferenceNumber = grantPermission(subjectNip);
 
-        Thread.sleep(5000);
+        await().atMost(5, SECONDS)
+                .pollInterval(1, SECONDS)
+                .until(() -> isOperationFinish(grantReferenceNumber));
 
-        checkPermissionStatus(grantReferenceNumber);
+        var permission = searchPermission(subjectNip, 1);
 
-        checkGrantedPermission(subjectNip, 1);
+        permission.forEach(e -> {
+            var revokeReferenceNumber = revokePermission(e);
+
+            await().atMost(30, SECONDS)
+                    .pollInterval(2, SECONDS)
+                    .until(() -> isOperationFinish(revokeReferenceNumber));
+        });
+        searchPermission(subjectNip, 0);
     }
 
-    private void checkGrantedPermission(String subjectNip, int expected) throws ApiException {
+    private List<String> searchPermission(String subjectNip, int expected) throws ApiException {
         var request = new PersonPermissionsQueryRequestBuilder()
                 .withAuthorizedIdentifier(new PersonPermissionsAuthorizedIdentifier(PersonPermissionsAuthorizedIdentifierType.NIP, subjectNip))
                 .build();
 
         var response = defaultKsefClient.searchGrantedPersonPermissions(request, 0, 10);
         Assertions.assertEquals(expected, response.getPermissions().size());
+
+        if (response.getPermissions().isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        return response.getPermissions()
+                .stream()
+                .map(PersonPermission::getId)
+                .toList();
+    }
+
+    private String revokePermission(String operationId) {
+        try {
+            return defaultKsefClient.revokeCommonPermission(operationId).getOperationReferenceNumber();
+        } catch (ApiException e) {
+            Assertions.fail(e.getMessage());
+        }
+        return null;
     }
 
     private String grantPermission(String subjectNip) throws ApiException {
@@ -55,11 +88,9 @@ class PersonPermissionIntegrationTest extends BaseIntegrationTest {
         return response.getOperationReferenceNumber();
     }
 
-    private void checkPermissionStatus(String referenceNumber) throws ApiException {
-        var status = defaultKsefClient.operations(referenceNumber);
-
-        Assertions.assertNotNull(status);
-        Assertions.assertEquals(200, status.getStatus().getCode());
+    private Boolean isOperationFinish(String referenceNumber) throws ApiException {
+        PermissionStatusInfo operations = defaultKsefClient.permissionOperationStatus(referenceNumber);
+        return operations != null && operations.getStatus().getCode() == 200;
     }
 }
 
