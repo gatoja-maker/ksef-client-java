@@ -1,5 +1,7 @@
 package pl.akmf.ksef.sdk.api.services;
 
+import org.apache.commons.collections4.CollectionUtils;
+import pl.akmf.ksef.sdk.api.ActiveSessionApi;
 import pl.akmf.ksef.sdk.api.AuthenticationApi;
 import pl.akmf.ksef.sdk.api.BatchInvoiceApi;
 import pl.akmf.ksef.sdk.api.CertificateApi;
@@ -11,6 +13,7 @@ import pl.akmf.ksef.sdk.api.GrantDirectlyApi;
 import pl.akmf.ksef.sdk.api.InteractiveSessionApi;
 import pl.akmf.ksef.sdk.api.NaturalPersonKseFApi;
 import pl.akmf.ksef.sdk.api.OperationApi;
+import pl.akmf.ksef.sdk.api.PublicKeyCertificateApi;
 import pl.akmf.ksef.sdk.api.PublicKeyEnvironmentApi;
 import pl.akmf.ksef.sdk.api.SearchPermissionApi;
 import pl.akmf.ksef.sdk.api.SendStatusAndUpoApi;
@@ -41,6 +44,7 @@ import pl.akmf.ksef.sdk.client.model.certificate.CertificateMetadataListRequest;
 import pl.akmf.ksef.sdk.client.model.certificate.CertificateMetadataListResponse;
 import pl.akmf.ksef.sdk.client.model.certificate.CertificateRevokeRequest;
 import pl.akmf.ksef.sdk.client.model.certificate.SendCertificateEnrollmentRequest;
+import pl.akmf.ksef.sdk.client.model.certificate.publickey.PublicKeyCertificate;
 import pl.akmf.ksef.sdk.client.model.invoice.AsyncInvoicesQueryStatus;
 import pl.akmf.ksef.sdk.client.model.invoice.DownloadInvoiceRequest;
 import pl.akmf.ksef.sdk.client.model.invoice.InitAsyncInvoicesQueryResponse;
@@ -67,9 +71,12 @@ import pl.akmf.ksef.sdk.client.model.permission.search.QuerySubunitPermissionsRe
 import pl.akmf.ksef.sdk.client.model.permission.search.SubordinateEntityRolesQueryRequest;
 import pl.akmf.ksef.sdk.client.model.permission.search.SubunitPermissionsQueryRequest;
 import pl.akmf.ksef.sdk.client.model.permission.subunit.GrantSubUnitPermissionsRequest;
+import pl.akmf.ksef.sdk.client.model.session.AuthenticationListResponse;
 import pl.akmf.ksef.sdk.client.model.session.SessionInvoice;
 import pl.akmf.ksef.sdk.client.model.session.SessionInvoicesResponse;
 import pl.akmf.ksef.sdk.client.model.session.SessionStatusResponse;
+import pl.akmf.ksef.sdk.client.model.session.SessionsQueryRequest;
+import pl.akmf.ksef.sdk.client.model.session.SessionsQueryResponse;
 import pl.akmf.ksef.sdk.client.model.session.batch.BatchPartSendingInfo;
 import pl.akmf.ksef.sdk.client.model.session.batch.OpenBatchSessionRequest;
 import pl.akmf.ksef.sdk.client.model.session.batch.OpenBatchSessionResponse;
@@ -108,6 +115,8 @@ public class DefaultKsefClient implements KSeFClient {
     private OperationApi operationApi;
     private PublicKeyEnvironmentApi publicKeyEnvironmentApi;
     private TokensApi tokensApi;
+    private PublicKeyCertificateApi publicKeyCertificateApi;
+    private ActiveSessionApi activeSessionApi;
 
     public DefaultKsefClient(KsefEnviroments ksefEnviroments) {
         this.apiClient = createApiClient(ksefEnviroments);
@@ -126,7 +135,7 @@ public class DefaultKsefClient implements KSeFClient {
     }
 
     @Override
-    public OpenBatchSessionResponse batchOpen(OpenBatchSessionRequest body) throws ApiException {
+    public OpenBatchSessionResponse openBatchSession(OpenBatchSessionRequest body) throws ApiException {
 
         return batchInvoiceApi.batchOpenWithHttpInfo(body).getData();
     }
@@ -137,14 +146,14 @@ public class DefaultKsefClient implements KSeFClient {
     }
 
     @Override
-    public void sendBatchParts(OpenBatchSessionResponse response, List<BatchPartSendingInfo> parts) throws IOException, InterruptedException {
-        if (parts == null || parts.isEmpty()) {
-            throw new IllegalArgumentException("Brak plików do wysłania.");
+    public void sendBatchParts(OpenBatchSessionResponse openBatchSessionResponse, List<BatchPartSendingInfo> parts) throws IOException, InterruptedException {
+        if (CollectionUtils.isEmpty(parts)) {
+            throw new IllegalArgumentException("No files to send.");
         }
 
-        List<PackagePartSignatureInitResponseType> responsePartUploadRequests = response.getPartUploadRequests();
-        if (responsePartUploadRequests == null || responsePartUploadRequests.isEmpty()) {
-            throw new IllegalStateException("Brak informacji o partach do wysłania.");
+        List<PackagePartSignatureInitResponseType> responsePartUploadRequests = openBatchSessionResponse.getPartUploadRequests();
+        if (CollectionUtils.isEmpty(responsePartUploadRequests)) {
+            throw new IllegalStateException("No information about parts to send.");
         }
 
         HttpClient client = HttpClient.newHttpClient();
@@ -162,6 +171,7 @@ public class DefaultKsefClient implements KSeFClient {
             HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
                     .uri(responsePart.getUrl())
                     .PUT(bodyPublisher);
+            requestBuilder.header("Content-Type", "application/octet-stream");
 
             Map<String, String> headerEntryList = responsePart.getHeaders();
             if (headerEntryList != null) {
@@ -171,13 +181,13 @@ public class DefaultKsefClient implements KSeFClient {
             HttpResponse<String> responseResult = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
 
             if (responseResult.statusCode() >= 400) {
-                errors.add("Błąd wysyłki partu " + responsePart.getOrdinalNumber() + ": " +
+                errors.add("Error sends part " + responsePart.getOrdinalNumber() + ": " +
                         responseResult.statusCode() + " " + responseResult.body());
             }
         }
 
         if (!errors.isEmpty()) {
-            throw new IOException("Błędy podczas wysyłania partów:\n" + String.join("\n", errors));
+            throw new IOException("Errors when sending parts:\n" + String.join("\n", errors));
         }
     }
 
@@ -237,14 +247,14 @@ public class DefaultKsefClient implements KSeFClient {
     }
 
     @Override
-    public AuthenticationInitResponse submitAuthTokenRequest(String body) throws ApiException {
-        var initResponse = authenticationApi.apiV2AuthTokenSignaturePostWithHttpInfo(body).getData();
+    public AuthenticationInitResponse submitAuthTokenRequest(String signedXml, boolean verifyCertificateChain) throws ApiException {
+        var initResponse = authenticationApi.apiV2AuthTokenSignaturePostWithHttpInfo(signedXml, verifyCertificateChain).getData();
 
         if (initResponse.getAuthenticationToken() == null) {
             throw new ApiException();
         }
 
-        setNewBearerToken(initResponse.getAuthenticationToken().getToken());
+        setNewAccessToken(initResponse.getAuthenticationToken().getToken());
         initApiClient();
 
         return initResponse;
@@ -258,14 +268,14 @@ public class DefaultKsefClient implements KSeFClient {
             throw new ApiException();
         }
 
-        setNewBearerToken(initResponse.getAuthenticationToken().getToken());
+        setNewAccessToken(initResponse.getAuthenticationToken().getToken());
         initApiClient();
 
         return initResponse;
     }
 
     @Override
-    public AuthStatus getAuthStatus(String referenceNumber) throws ApiException {
+    public pl.akmf.ksef.sdk.client.model.session.AuthenticationOperationStatusResponse getAuthStatus(String referenceNumber) throws ApiException {
 
         return authenticationApi.apiV2AuthTokenTokenReferenceNumberGetWithHttpInfo(referenceNumber).getData();
     }
@@ -275,7 +285,7 @@ public class DefaultKsefClient implements KSeFClient {
         var authenticationOperationStatusResponse = authenticationApi.apiV2AuthRedeemTokenPost().getData();
 
 
-        setNewBearerToken(authenticationOperationStatusResponse.getAccessToken().getToken());
+        setNewAccessToken(authenticationOperationStatusResponse.getAccessToken().getToken());
         initApiClient();
 
         return authenticationOperationStatusResponse;
@@ -283,7 +293,7 @@ public class DefaultKsefClient implements KSeFClient {
 
     @Override
     public AuthenticationTokenRefreshResponse refreshAccessToken(String refreshToken) throws ApiException {
-        setNewBearerToken(refreshToken);
+        setNewAccessToken(refreshToken);
 
         initApiClient();
         var refreshTokenResponse = authenticationApi.apiV2AuthTokenRefreshPostWithHttpInfo().getData();
@@ -293,7 +303,7 @@ public class DefaultKsefClient implements KSeFClient {
 
         }
 
-        setNewBearerToken(refreshTokenResponse.getAccessToken().getToken());
+        setNewAccessToken(refreshTokenResponse.getAccessToken().getToken());
         initApiClient();
 
         return refreshTokenResponse;
@@ -305,7 +315,7 @@ public class DefaultKsefClient implements KSeFClient {
     }
 
     @Override
-    public PermissionStatusInfo operations(String referenceNumber) throws ApiException {
+    public PermissionStatusInfo permissionOperationStatus(String referenceNumber) throws ApiException {
         return operationApi.apiV2PermissionsOperationsReferenceNumberGet(referenceNumber).getData();
     }
 
@@ -361,7 +371,7 @@ public class DefaultKsefClient implements KSeFClient {
         return downloadInvoiceApi.apiV2InvoicesDownloadPost(request).getData();
     }
 
-    public QueryInvoicesReponse getInvoiceMetadane(Integer pageOffset, Integer pageSize, InvoicesQueryRequest request) throws ApiException {
+    public QueryInvoicesReponse queryInvoices(Integer pageOffset, Integer pageSize, InvoicesQueryRequest request) throws ApiException {
         return downloadInvoiceApi.apiV2InvoicesQueryPost(pageOffset, pageSize, request).getData();
     }
 
@@ -411,8 +421,28 @@ public class DefaultKsefClient implements KSeFClient {
     }
 
     @Override
-    public SessionInvoicesResponse getSessionFailedInvoices(String referenceNumber, Integer pageSize) throws ApiException {
-        return sendStatusAndUpoApi.apiV2SessionsReferenceNumberInvoicesFailedGet(referenceNumber, null, null).getData();
+    public SessionInvoicesResponse getSessionFailedInvoices(String referenceNumber, String continuationToken, Integer pageSize) throws ApiException {
+        return sendStatusAndUpoApi.apiV2SessionsReferenceNumberInvoicesFailedGet(referenceNumber, continuationToken, pageSize).getData();
+    }
+
+    @Override
+    public SessionsQueryResponse getSessions(SessionsQueryRequest request, Integer pageSize, String continuationToken) throws ApiException {
+        return sendStatusAndUpoApi.apiV2SessionsGet(request, pageSize, continuationToken).getData();
+    }
+
+    @Override
+    public AuthenticationListResponse getActiveSessions(Integer pageSize, String continuationToken) throws ApiException {
+        return activeSessionApi.apiV2AuthSessionsGet(pageSize, continuationToken).getData();
+    }
+
+    @Override
+    public void revokeCurrentSession() throws ApiException {
+        activeSessionApi.apiV2AuthSessionsCurrentDelete();
+    }
+
+    @Override
+    public void revokeSession(String referenceNumber) throws ApiException {
+        activeSessionApi.apiV2AuthSessionsReferenceNumberDelete(referenceNumber);
     }
 
     //------------------ END Session------------------
@@ -433,12 +463,12 @@ public class DefaultKsefClient implements KSeFClient {
 
     @Override
     public PermissionsOperationResponse revokeCommonPermission(String permissionId) throws ApiException {
-        return operationApi.apiV2PermissionsCommonGrantsPermissionIdDeleteWithHttpInfo(permissionId).getData();
+        return operationApi.apiV2PermissionsCommonGrantsPermissionIdDelete(permissionId).getData();
     }
 
     @Override
     public PermissionsOperationResponse revokeAuthorizationsPermission(String permissionId) throws ApiException {
-        return operationApi.apiV2PermissionsAuthorizationsGrantsPermissionIdDeleteWithHttpInfo(permissionId).getData();
+        return operationApi.apiV2PermissionsAuthorizationsGrantsPermissionIdDelete(permissionId).getData();
     }
 
     @Override
@@ -448,23 +478,33 @@ public class DefaultKsefClient implements KSeFClient {
 
     //------------------ START Tokens ------------------
 
+    @Override
     public GenerateTokenResponse generateKsefToken(GenerateTokenRequest tokenRequest) throws ApiException {
         return tokensApi.apiV2TokensPost(tokenRequest).getData();
     }
 
-    public QueryTokensResponse queryKsefTokens(List<AuthenticationTokenStatus> status, String continuationToken, Integer pageSize) throws ApiException {
+    @Override
+    public QueryTokensResponse queryKsefTokens(List<AuthenticationTokenStatus> statuses, String continuationToken, Integer pageSize) throws ApiException {
 
-        return tokensApi.apiV2TokensGet(status, continuationToken, pageSize).getData();
+        return tokensApi.apiV2TokensGet(statuses, continuationToken, pageSize).getData();
     }
 
+    @Override
     public AuthenticationToken getKsefToken(String referenceNumber) throws ApiException {
 
         return tokensApi.apiV2TokensReferenceNumberGet(referenceNumber).getData();
     }
 
+    @Override
     public void revokeKsefToken(String referenceNumber) throws ApiException {
 
-        tokensApi.apiV2TokensReferenceNumberDelete(referenceNumber).getData();
+        tokensApi.apiV2TokensReferenceNumberDelete(referenceNumber);
+    }
+
+    @Override
+    public List<PublicKeyCertificate> retrievePublicKeyCertificate() throws ApiException {
+
+        return publicKeyCertificateApi.apiV2SecurityPublicKeyCertificatesGet().getData();
     }
 
     //------------------ END Tokens ------------------
@@ -497,9 +537,11 @@ public class DefaultKsefClient implements KSeFClient {
         this.operationApi = new OperationApi(apiClient);
         this.publicKeyEnvironmentApi = new PublicKeyEnvironmentApi(apiClient);
         this.tokensApi = new TokensApi(apiClient);
+        this.publicKeyCertificateApi = new PublicKeyCertificateApi(apiClient);
+        this.activeSessionApi = new ActiveSessionApi(apiClient);
     }
 
-    private void setNewBearerToken(String accessToken) {
+    private void setNewAccessToken(String accessToken) {
         apiClient.setRequestInterceptor(builder -> builder.header("Authorization", "Bearer " + accessToken));
     }
 }

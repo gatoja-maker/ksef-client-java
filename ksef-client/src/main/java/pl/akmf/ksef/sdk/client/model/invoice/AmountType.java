@@ -15,7 +15,7 @@ public enum AmountType {
   
   VAT("Vat");
 
-  private String value;
+  private final String value;
 
   AmountType(String value) {
     this.value = value;
@@ -40,20 +40,4 @@ public enum AmountType {
     }
     throw new IllegalArgumentException("Unexpected value '" + value + "'");
   }
-
-  /**
-   * Convert the instance into URL query string.
-   *
-   * @param prefix prefix of the query string
-   * @return URL query string
-   */
-  public String toUrlQueryString(String prefix) {
-    if (prefix == null) {
-      prefix = "";
-    }
-
-    return String.format("%s=%s", prefix, this.toString());
-  }
-
 }
-

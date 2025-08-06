@@ -2,6 +2,7 @@ package pl.akmf.ksef.sdk.api.builders.permission.person;
 
 import pl.akmf.ksef.sdk.client.model.permission.person.PersonPermissionType;
 import pl.akmf.ksef.sdk.client.model.permission.search.PermissionState;
+import pl.akmf.ksef.sdk.client.model.permission.search.PersonPermissionQueryType;
 import pl.akmf.ksef.sdk.client.model.permission.search.PersonPermissionsAuthorIdentifier;
 import pl.akmf.ksef.sdk.client.model.permission.search.PersonPermissionsAuthorizedIdentifier;
 import pl.akmf.ksef.sdk.client.model.permission.search.PersonPermissionsQueryRequest;
@@ -15,6 +16,7 @@ public class PersonPermissionsQueryRequestBuilder {
     private PersonPermissionsTargetIdentifier targetIdentifier;
     private List<PersonPermissionType> permissionTypes;
     private PermissionState permissionState;
+    private PersonPermissionQueryType queryType;
 
     public PersonPermissionsQueryRequestBuilder withAuthorIdentifier(PersonPermissionsAuthorIdentifier authorIdentifier) {
         this.authorIdentifier = authorIdentifier;
@@ -41,7 +43,12 @@ public class PersonPermissionsQueryRequestBuilder {
         return this;
     }
 
+    public PersonPermissionsQueryRequestBuilder withQueryType(PersonPermissionQueryType queryType) {
+        this.queryType = queryType;
+        return this;
+    }
+
     public PersonPermissionsQueryRequest build() {
-        return new PersonPermissionsQueryRequest(authorIdentifier, authorizedIdentifier, targetIdentifier, permissionTypes, permissionState);
+        return new PersonPermissionsQueryRequest(authorIdentifier, authorizedIdentifier, targetIdentifier, permissionTypes, permissionState, queryType);
     }
 }

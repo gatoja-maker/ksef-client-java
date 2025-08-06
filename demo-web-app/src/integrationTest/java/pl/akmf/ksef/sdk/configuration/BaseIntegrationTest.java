@@ -26,6 +26,8 @@ import pl.akmf.ksef.sdk.client.model.xml.SubjectIdentifierTypeEnum;
 
 import java.io.IOException;
 
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.awaitility.Awaitility.await;
 import static org.springframework.boot.test.context.SpringBootTest.WebEnvironment.RANDOM_PORT;
 
 @Testcontainers
@@ -58,7 +60,7 @@ public abstract class BaseIntegrationTest {
         wireMock.stop();
     }
 
-    protected AuthTokensPair authWithCustomNip(String context,ContextIdentifierTypeEnum contextType, String subject) throws ApiException, JAXBException, IOException, InterruptedException {
+    protected AuthTokensPair authWithCustomNip(String context, ContextIdentifierTypeEnum contextType, String subject) throws ApiException, JAXBException, IOException {
         var challenge = defaultKsefClient.getAuthChallenge();
 
         AuthTokenRequest authTokenRequest = new AuthTokenRequestBuilder()
@@ -72,17 +74,25 @@ public abstract class BaseIntegrationTest {
         var x500 = new CertificateBuilders()
                 .buildForOrganization("Kowalski sp. z o.o", "VATPL-" + subject, "Kowalski");
 
-        SelfSignedCertificate cert = new DefaultCertificateGenerator().generateSelfSignedCertificate(x500);
+        SelfSignedCertificate cert = new DefaultCertificateGenerator().generateSelfSignedCertificateRsa(x500);
 
         var signedXml = new DefaultSignatureService().sign(xml.getBytes(), cert.certificate(), cert.getPrivateKey());
 
-        var submitAuthTokenResponse = defaultKsefClient.submitAuthTokenRequest(signedXml);
+        var submitAuthTokenResponse = defaultKsefClient.submitAuthTokenRequest(signedXml, false);
 
-        Thread.sleep(2000);
+        //Czekanie na zakończenie procesu
+        await().atMost(4, SECONDS)
+                .pollInterval(1, SECONDS)
+                .until(() -> isSessionStatusReady(submitAuthTokenResponse.getReferenceNumber()));
 
         var tokenResponse = defaultKsefClient.redeemToken();
 
         return new AuthTokensPair(tokenResponse.getAccessToken().getToken(), tokenResponse.getRefreshToken().getToken());
+    }
+
+    private boolean isSessionStatusReady(String referenceNumber) throws ApiException {
+        var checkAuthStatus = defaultKsefClient.getAuthStatus(referenceNumber);
+        return checkAuthStatus != null && checkAuthStatus.getStatus().getCode() == 200;
     }
 
     public record AuthTokensPair(String authToken, String refreshToken) {

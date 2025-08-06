@@ -15,7 +15,6 @@ import pl.akmf.ksef.sdk.client.model.auth.QueryTokensResponse;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
@@ -24,40 +23,24 @@ import java.util.List;
 import java.util.StringJoiner;
 import java.util.function.Consumer;
 
-public class TokensApi {
-    private final HttpClient memberVarHttpClient;
+import static pl.akmf.ksef.sdk.api.Url.TOKEN_GENERATE;
+import static pl.akmf.ksef.sdk.api.Url.TOKEN_LIST;
+import static pl.akmf.ksef.sdk.api.Url.TOKEN_REVOKE;
+import static pl.akmf.ksef.sdk.api.Url.TOKEN_STATUS;
+
+public class TokensApi extends BaseApi {
     private final ObjectMapper memberVarObjectMapper;
     private final String memberVarBaseUri;
     private final Consumer<HttpRequest.Builder> memberVarInterceptor;
     private final Duration memberVarReadTimeout;
-    private final Consumer<HttpResponse<InputStream>> memberVarResponseInterceptor;
-
-    public TokensApi() {
-        this(new ApiClient());
-    }
 
     public TokensApi(ApiClient apiClient) {
-        memberVarHttpClient = apiClient.getHttpClient();
+        super(apiClient.getHttpClient(),apiClient.getResponseInterceptor());
         memberVarObjectMapper = apiClient.getObjectMapper();
         memberVarBaseUri = apiClient.getBaseUri();
         memberVarInterceptor = apiClient.getRequestInterceptor();
         memberVarReadTimeout = apiClient.getReadTimeout();
-        memberVarResponseInterceptor = apiClient.getResponseInterceptor();
     }
-
-    protected ApiException getApiException(String operationId, HttpResponse<InputStream> response) throws IOException {
-        String body = response.body() == null ? null : new String(response.body().readAllBytes());
-        String message = formatExceptionMessage(operationId, response.statusCode(), body);
-        return new ApiException(response.statusCode(), message, response.headers(), body);
-    }
-
-    private String formatExceptionMessage(String operationId, int statusCode, String body) {
-        if (body == null || body.isEmpty()) {
-            body = "[no body]";
-        }
-        return operationId + " call failed with: " + statusCode + " - " + body;
-    }
-
 
     /**
      * Pobranie listy wygenerowanych tokenów
@@ -71,20 +54,14 @@ public class TokensApi {
     public ApiResponse<QueryTokensResponse> apiV2TokensGet(List<AuthenticationTokenStatus> status, String xContinuationToken, Integer pageSize) throws ApiException {
         HttpRequest.Builder localVarRequestBuilder = apiV2TokensGetRequestBuilder(status, xContinuationToken, pageSize);
         try {
-            HttpResponse<InputStream> localVarResponse = memberVarHttpClient.send(
-                    localVarRequestBuilder.build(),
-                    HttpResponse.BodyHandlers.ofInputStream());
-            if (memberVarResponseInterceptor != null) {
-                memberVarResponseInterceptor.accept(localVarResponse);
-            }
-            if (localVarResponse.statusCode() / 100 != 2) {
-                throw getApiException("apiV2TokensGet", localVarResponse);
-            }
+            HttpResponse<InputStream> localVarResponse = getInputStreamHttpResponse(localVarRequestBuilder,
+                    TOKEN_LIST.getOperationId());
+
             return new ApiResponse<>(
                     localVarResponse.statusCode(),
                     localVarResponse.headers().map(),
                     localVarResponse.body() == null ? null : memberVarObjectMapper.readValue(localVarResponse.body(), new TypeReference<>() {
-                    }) // closes the InputStream
+                    })
             );
         } catch (IOException e) {
             throw new ApiException(e);
@@ -98,7 +75,7 @@ public class TokensApi {
 
         HttpRequest.Builder localVarRequestBuilder = HttpRequest.newBuilder();
 
-        String localVarPath = "/api/v2/tokens";
+        String localVarPath = TOKEN_LIST.getUrl();
 
         List<Pair> localVarQueryParams = new ArrayList<>();
         StringJoiner localVarQueryStringJoiner = new StringJoiner("&");
@@ -142,20 +119,14 @@ public class TokensApi {
     public ApiResponse<GenerateTokenResponse> apiV2TokensPost(GenerateTokenRequest generateTokenRequest) throws ApiException {
         HttpRequest.Builder localVarRequestBuilder = apiV2TokensPostRequestBuilder(generateTokenRequest);
         try {
-            HttpResponse<InputStream> localVarResponse = memberVarHttpClient.send(
-                    localVarRequestBuilder.build(),
-                    HttpResponse.BodyHandlers.ofInputStream());
-            if (memberVarResponseInterceptor != null) {
-                memberVarResponseInterceptor.accept(localVarResponse);
-            }
-            if (localVarResponse.statusCode() / 100 != 2) {
-                throw getApiException("apiV2TokensPost", localVarResponse);
-            }
+            HttpResponse<InputStream> localVarResponse = getInputStreamHttpResponse(localVarRequestBuilder,
+                    TOKEN_GENERATE.getOperationId());
+
             return new ApiResponse<>(
                     localVarResponse.statusCode(),
                     localVarResponse.headers().map(),
                     localVarResponse.body() == null ? null : memberVarObjectMapper.readValue(localVarResponse.body(), new TypeReference<>() {
-                    }) // closes the InputStream
+                    })
             );
         } catch (IOException e) {
             throw new ApiException(e);
@@ -169,7 +140,7 @@ public class TokensApi {
 
         HttpRequest.Builder localVarRequestBuilder = HttpRequest.newBuilder();
 
-        String localVarPath = "/api/v2/tokens";
+        String localVarPath = TOKEN_GENERATE.getUrl();
 
         localVarRequestBuilder.uri(URI.create(memberVarBaseUri + localVarPath));
 
@@ -202,24 +173,14 @@ public class TokensApi {
     public ApiResponse<Void> apiV2TokensReferenceNumberDelete(String referenceNumber) throws ApiException {
         HttpRequest.Builder localVarRequestBuilder = apiV2TokensReferenceNumberDeleteRequestBuilder(referenceNumber);
         try {
-            HttpResponse<InputStream> localVarResponse = memberVarHttpClient.send(
-                    localVarRequestBuilder.build(),
-                    HttpResponse.BodyHandlers.ofInputStream());
-            if (memberVarResponseInterceptor != null) {
-                memberVarResponseInterceptor.accept(localVarResponse);
-            }
-            try {
-                if (localVarResponse.statusCode() / 100 != 2) {
-                    throw getApiException("apiV2TokensReferenceNumberDelete", localVarResponse);
-                }
-                return new ApiResponse<>(
-                        localVarResponse.statusCode(),
-                        localVarResponse.headers().map(),
-                        null
-                );
-            } finally {
-                localVarResponse.body().close();
-            }
+            HttpResponse<InputStream> localVarResponse = getInputStreamHttpResponse(localVarRequestBuilder,
+                    TOKEN_REVOKE.getOperationId());
+
+            return new ApiResponse<>(
+                    localVarResponse.statusCode(),
+                    localVarResponse.headers().map(),
+                    null
+            );
         } catch (IOException e) {
             throw new ApiException(e);
         } catch (InterruptedException e) {
@@ -229,14 +190,13 @@ public class TokensApi {
     }
 
     private HttpRequest.Builder apiV2TokensReferenceNumberDeleteRequestBuilder(String referenceNumber) throws ApiException {
-        // verify the required parameter 'referenceNumber' is set
         if (referenceNumber == null) {
             throw new ApiException(400, "Missing the required parameter 'referenceNumber' when calling apiV2TokensReferenceNumberDelete");
         }
 
         HttpRequest.Builder localVarRequestBuilder = HttpRequest.newBuilder();
 
-        String localVarPath = "/api/v2/tokens/{referenceNumber}"
+        String localVarPath = TOKEN_REVOKE.getUrl()
                 .replace("{referenceNumber}", ApiClient.urlEncode(referenceNumber));
 
         localVarRequestBuilder.uri(URI.create(memberVarBaseUri + localVarPath));
@@ -253,7 +213,6 @@ public class TokensApi {
         return localVarRequestBuilder;
     }
 
-
     /**
      * Pobranie statusu tokena
      *
@@ -264,20 +223,14 @@ public class TokensApi {
     public ApiResponse<AuthenticationToken> apiV2TokensReferenceNumberGet(String referenceNumber) throws ApiException {
         HttpRequest.Builder localVarRequestBuilder = apiV2TokensReferenceNumberGetRequestBuilder(referenceNumber);
         try {
-            HttpResponse<InputStream> localVarResponse = memberVarHttpClient.send(
-                    localVarRequestBuilder.build(),
-                    HttpResponse.BodyHandlers.ofInputStream());
-            if (memberVarResponseInterceptor != null) {
-                memberVarResponseInterceptor.accept(localVarResponse);
-            }
-            if (localVarResponse.statusCode() / 100 != 2) {
-                throw getApiException("apiV2TokensReferenceNumberGet", localVarResponse);
-            }
+            HttpResponse<InputStream> localVarResponse = getInputStreamHttpResponse(localVarRequestBuilder,
+                    TOKEN_STATUS.getOperationId());
+
             return new ApiResponse<>(
                     localVarResponse.statusCode(),
                     localVarResponse.headers().map(),
                     localVarResponse.body() == null ? null : memberVarObjectMapper.readValue(localVarResponse.body(), new TypeReference<>() {
-                    }) // closes the InputStream
+                    })
             );
         } catch (IOException e) {
             throw new ApiException(e);
@@ -288,14 +241,13 @@ public class TokensApi {
     }
 
     private HttpRequest.Builder apiV2TokensReferenceNumberGetRequestBuilder(String referenceNumber) throws ApiException {
-        // verify the required parameter 'referenceNumber' is set
         if (referenceNumber == null) {
             throw new ApiException(400, "Missing the required parameter 'referenceNumber' when calling apiV2TokensReferenceNumberGet");
         }
 
         HttpRequest.Builder localVarRequestBuilder = HttpRequest.newBuilder();
 
-        String localVarPath = "/api/v2/tokens/{referenceNumber}"
+        String localVarPath = TOKEN_STATUS.getUrl()
                 .replace("{referenceNumber}", ApiClient.urlEncode(referenceNumber));
 
         localVarRequestBuilder.uri(URI.create(memberVarBaseUri + localVarPath));

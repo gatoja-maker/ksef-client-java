@@ -21,7 +21,6 @@ import pl.akmf.ksef.sdk.client.model.permission.search.SubunitPermissionsQueryRe
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
@@ -30,38 +29,25 @@ import java.util.List;
 import java.util.StringJoiner;
 import java.util.function.Consumer;
 
-public class SearchPermissionApi {
-    private final HttpClient memberVarHttpClient;
+import static pl.akmf.ksef.sdk.api.Url.PERMISSION_SEARCH_AUTHORIZATIONS_GRANT;
+import static pl.akmf.ksef.sdk.api.Url.PERMISSION_SEARCH_ENTITY_ROLES;
+import static pl.akmf.ksef.sdk.api.Url.PERMISSION_SEARCH_EU_ENTITY_GRANT;
+import static pl.akmf.ksef.sdk.api.Url.PERMISSION_SEARCH_PERSON_PERMISSION;
+import static pl.akmf.ksef.sdk.api.Url.PERMISSION_SEARCH_SUBORDINATE_PERMISSION;
+import static pl.akmf.ksef.sdk.api.Url.PERMISSION_SEARCH_SUBUNIT_GRANT;
+
+public class SearchPermissionApi extends BaseApi {
     private final ObjectMapper memberVarObjectMapper;
     private final String memberVarBaseUri;
     private final Consumer<HttpRequest.Builder> memberVarInterceptor;
     private final Duration memberVarReadTimeout;
-    private final Consumer<HttpResponse<InputStream>> memberVarResponseInterceptor;
-
-    public SearchPermissionApi() {
-        this(new ApiClient());
-    }
 
     public SearchPermissionApi(ApiClient apiClient) {
-        memberVarHttpClient = apiClient.getHttpClient();
+        super(apiClient.getHttpClient(), apiClient.getResponseInterceptor());
         memberVarObjectMapper = apiClient.getObjectMapper();
         memberVarBaseUri = apiClient.getBaseUri();
         memberVarInterceptor = apiClient.getRequestInterceptor();
         memberVarReadTimeout = apiClient.getReadTimeout();
-        memberVarResponseInterceptor = apiClient.getResponseInterceptor();
-    }
-
-    protected ApiException getApiException(String operationId, HttpResponse<InputStream> response) throws IOException {
-        String body = response.body() == null ? null : new String(response.body().readAllBytes());
-        String message = formatExceptionMessage(operationId, response.statusCode(), body);
-        return new ApiException(response.statusCode(), message, response.headers(), body);
-    }
-
-    private String formatExceptionMessage(String operationId, int statusCode, String body) {
-        if (body == null || body.isEmpty()) {
-            body = "[no body]";
-        }
-        return operationId + " call failed with: " + statusCode + " - " + body;
     }
 
     /**
@@ -76,20 +62,14 @@ public class SearchPermissionApi {
     public ApiResponse<QueryEntityAuthorizationPermissionsResponse> apiV2PermissionsQueryAuthorizationsGrantsPost(Integer pageOffset, Integer pageSize, EntityAuthorizationPermissionsQueryRequest entityAuthorizationPermissionsQueryRequest) throws ApiException {
         HttpRequest.Builder localVarRequestBuilder = apiV2PermissionsQueryAuthorizationsGrantsPostRequestBuilder(pageOffset, pageSize, entityAuthorizationPermissionsQueryRequest);
         try {
-            HttpResponse<InputStream> localVarResponse = memberVarHttpClient.send(
-                    localVarRequestBuilder.build(),
-                    HttpResponse.BodyHandlers.ofInputStream());
-            if (memberVarResponseInterceptor != null) {
-                memberVarResponseInterceptor.accept(localVarResponse);
-            }
-            if (localVarResponse.statusCode() / 100 != 2) {
-                throw getApiException("apiV2PermissionsQueryAuthorizationsGrantsPost", localVarResponse);
-            }
+            HttpResponse<InputStream> localVarResponse = getInputStreamHttpResponse(localVarRequestBuilder,
+                    PERMISSION_SEARCH_AUTHORIZATIONS_GRANT.getOperationId());
+
             return new ApiResponse<>(
                     localVarResponse.statusCode(),
                     localVarResponse.headers().map(),
                     localVarResponse.body() == null ? null : memberVarObjectMapper.readValue(localVarResponse.body(), new TypeReference<>() {
-                    }) // closes the InputStream
+                    })
             );
         } catch (IOException e) {
             throw new ApiException(e);
@@ -103,7 +83,7 @@ public class SearchPermissionApi {
 
         HttpRequest.Builder localVarRequestBuilder = HttpRequest.newBuilder();
 
-        String localVarPath = "/api/v2/permissions/query/authorizations/grants";
+        String localVarPath = PERMISSION_SEARCH_AUTHORIZATIONS_GRANT.getUrl();
 
         List<Pair> localVarQueryParams = new ArrayList<>();
         StringJoiner localVarQueryStringJoiner = new StringJoiner("&");
@@ -150,20 +130,13 @@ public class SearchPermissionApi {
     public ApiResponse<QueryEntityRolesResponse> apiV2PermissionsQueryEntitiesRolesGet(Integer pageOffset, Integer pageSize) throws ApiException {
         HttpRequest.Builder localVarRequestBuilder = apiV2PermissionsQueryEntitiesRolesGetRequestBuilder(pageOffset, pageSize);
         try {
-            HttpResponse<InputStream> localVarResponse = memberVarHttpClient.send(
-                    localVarRequestBuilder.build(),
-                    HttpResponse.BodyHandlers.ofInputStream());
-            if (memberVarResponseInterceptor != null) {
-                memberVarResponseInterceptor.accept(localVarResponse);
-            }
-            if (localVarResponse.statusCode() / 100 != 2) {
-                throw getApiException("apiV2PermissionsQueryEntitiesRolesGet", localVarResponse);
-            }
+            HttpResponse<InputStream> localVarResponse = getInputStreamHttpResponse(localVarRequestBuilder, PERMISSION_SEARCH_ENTITY_ROLES.getOperationId());
+
             return new ApiResponse<>(
                     localVarResponse.statusCode(),
                     localVarResponse.headers().map(),
                     localVarResponse.body() == null ? null : memberVarObjectMapper.readValue(localVarResponse.body(), new TypeReference<>() {
-                    }) // closes the InputStream
+                    })
             );
         } catch (IOException e) {
             throw new ApiException(e);
@@ -177,7 +150,7 @@ public class SearchPermissionApi {
 
         HttpRequest.Builder localVarRequestBuilder = HttpRequest.newBuilder();
 
-        String localVarPath = "/api/v2/permissions/query/entities/roles";
+        String localVarPath = PERMISSION_SEARCH_ENTITY_ROLES.getUrl();
 
         List<Pair> localVarQueryParams = new ArrayList<>();
         StringJoiner localVarQueryStringJoiner = new StringJoiner("&");
@@ -219,20 +192,13 @@ public class SearchPermissionApi {
     public ApiResponse<QueryEuEntityPermissionsResponse> apiV2PermissionsQueryEuEntitiesGrantsPost(Integer pageOffset, Integer pageSize, EuEntityPermissionsQueryRequest euEntityPermissionsQueryRequest) throws ApiException {
         HttpRequest.Builder localVarRequestBuilder = apiV2PermissionsQueryEuEntitiesGrantsPostRequestBuilder(pageOffset, pageSize, euEntityPermissionsQueryRequest);
         try {
-            HttpResponse<InputStream> localVarResponse = memberVarHttpClient.send(
-                    localVarRequestBuilder.build(),
-                    HttpResponse.BodyHandlers.ofInputStream());
-            if (memberVarResponseInterceptor != null) {
-                memberVarResponseInterceptor.accept(localVarResponse);
-            }
-            if (localVarResponse.statusCode() / 100 != 2) {
-                throw getApiException("apiV2PermissionsQueryEuEntitiesGrantsPost", localVarResponse);
-            }
+            HttpResponse<InputStream> localVarResponse = getInputStreamHttpResponse(localVarRequestBuilder, PERMISSION_SEARCH_EU_ENTITY_GRANT.getOperationId());
+
             return new ApiResponse<>(
                     localVarResponse.statusCode(),
                     localVarResponse.headers().map(),
                     localVarResponse.body() == null ? null : memberVarObjectMapper.readValue(localVarResponse.body(), new TypeReference<>() {
-                    }) // closes the InputStream
+                    })
             );
         } catch (IOException e) {
             throw new ApiException(e);
@@ -243,10 +209,9 @@ public class SearchPermissionApi {
     }
 
     private HttpRequest.Builder apiV2PermissionsQueryEuEntitiesGrantsPostRequestBuilder(Integer pageOffset, Integer pageSize, EuEntityPermissionsQueryRequest euEntityPermissionsQueryRequest) throws ApiException {
-
         HttpRequest.Builder localVarRequestBuilder = HttpRequest.newBuilder();
 
-        String localVarPath = "/api/v2/permissions/query/eu-entities/grants";
+        String localVarPath = PERMISSION_SEARCH_EU_ENTITY_GRANT.getUrl();
 
         List<Pair> localVarQueryParams = new ArrayList<>();
         StringJoiner localVarQueryStringJoiner = new StringJoiner("&");
@@ -294,20 +259,14 @@ public class SearchPermissionApi {
     public ApiResponse<QueryPersonPermissionsResponse> apiV2PermissionsQueryPersonsGrantsPost(Integer pageOffset, Integer pageSize, PersonPermissionsQueryRequest personPermissionsQueryRequest) throws ApiException {
         HttpRequest.Builder localVarRequestBuilder = apiV2PermissionsQueryPersonsGrantsPostRequestBuilder(pageOffset, pageSize, personPermissionsQueryRequest);
         try {
-            HttpResponse<InputStream> localVarResponse = memberVarHttpClient.send(
-                    localVarRequestBuilder.build(),
-                    HttpResponse.BodyHandlers.ofInputStream());
-            if (memberVarResponseInterceptor != null) {
-                memberVarResponseInterceptor.accept(localVarResponse);
-            }
-            if (localVarResponse.statusCode() / 100 != 2) {
-                throw getApiException("apiV2PermissionsQueryPersonsGrantsPost", localVarResponse);
-            }
+            HttpResponse<InputStream> localVarResponse = getInputStreamHttpResponse(localVarRequestBuilder,
+                    PERMISSION_SEARCH_PERSON_PERMISSION.getOperationId());
+
             return new ApiResponse<>(
                     localVarResponse.statusCode(),
                     localVarResponse.headers().map(),
                     localVarResponse.body() == null ? null : memberVarObjectMapper.readValue(localVarResponse.body(), new TypeReference<>() {
-                    }) // closes the InputStream
+                    })
             );
         } catch (IOException e) {
             throw new ApiException(e);
@@ -321,7 +280,7 @@ public class SearchPermissionApi {
 
         HttpRequest.Builder localVarRequestBuilder = HttpRequest.newBuilder();
 
-        String localVarPath = "/api/v2/permissions/query/persons/grants";
+        String localVarPath = PERMISSION_SEARCH_PERSON_PERMISSION.getUrl();
 
         List<Pair> localVarQueryParams = new ArrayList<>();
         StringJoiner localVarQueryStringJoiner = new StringJoiner("&");
@@ -369,15 +328,9 @@ public class SearchPermissionApi {
     public ApiResponse<QuerySubordinateEntityRolesResponse> apiV2PermissionsQuerySubordinateEntitiesRolesPost(Integer pageOffset, Integer pageSize, SubordinateEntityRolesQueryRequest subordinateEntityRolesQueryRequest) throws ApiException {
         HttpRequest.Builder localVarRequestBuilder = apiV2PermissionsQuerySubordinateEntitiesRolesPostRequestBuilder(pageOffset, pageSize, subordinateEntityRolesQueryRequest);
         try {
-            HttpResponse<InputStream> localVarResponse = memberVarHttpClient.send(
-                    localVarRequestBuilder.build(),
-                    HttpResponse.BodyHandlers.ofInputStream());
-            if (memberVarResponseInterceptor != null) {
-                memberVarResponseInterceptor.accept(localVarResponse);
-            }
-            if (localVarResponse.statusCode() / 100 != 2) {
-                throw getApiException("apiV2PermissionsQuerySubordinateEntitiesRolesPost", localVarResponse);
-            }
+            HttpResponse<InputStream> localVarResponse = getInputStreamHttpResponse(localVarRequestBuilder,
+                    PERMISSION_SEARCH_SUBORDINATE_PERMISSION.getOperationId());
+
             return new ApiResponse<>(
                     localVarResponse.statusCode(),
                     localVarResponse.headers().map(),
@@ -396,7 +349,7 @@ public class SearchPermissionApi {
 
         HttpRequest.Builder localVarRequestBuilder = HttpRequest.newBuilder();
 
-        String localVarPath = "/api/v2/permissions/query/subordinate-entities/roles";
+        String localVarPath = PERMISSION_SEARCH_SUBORDINATE_PERMISSION.getUrl();
 
         List<Pair> localVarQueryParams = new ArrayList<>();
         StringJoiner localVarQueryStringJoiner = new StringJoiner("&");
@@ -444,20 +397,14 @@ public class SearchPermissionApi {
     public ApiResponse<QuerySubunitPermissionsResponse> apiV2PermissionsQuerySubunitsGrantsPost(Integer pageOffset, Integer pageSize, SubunitPermissionsQueryRequest subunitPermissionsQueryRequest) throws ApiException {
         HttpRequest.Builder localVarRequestBuilder = apiV2PermissionsQuerySubunitsGrantsPostRequestBuilder(pageOffset, pageSize, subunitPermissionsQueryRequest);
         try {
-            HttpResponse<InputStream> localVarResponse = memberVarHttpClient.send(
-                    localVarRequestBuilder.build(),
-                    HttpResponse.BodyHandlers.ofInputStream());
-            if (memberVarResponseInterceptor != null) {
-                memberVarResponseInterceptor.accept(localVarResponse);
-            }
-            if (localVarResponse.statusCode() / 100 != 2) {
-                throw getApiException("apiV2PermissionsQuerySubunitsGrantsPost", localVarResponse);
-            }
+            HttpResponse<InputStream> localVarResponse = getInputStreamHttpResponse(localVarRequestBuilder,
+                    PERMISSION_SEARCH_SUBUNIT_GRANT.getOperationId());
+
             return new ApiResponse<>(
                     localVarResponse.statusCode(),
                     localVarResponse.headers().map(),
                     localVarResponse.body() == null ? null : memberVarObjectMapper.readValue(localVarResponse.body(), new TypeReference<>() {
-                    }) // closes the InputStream
+                    })
             );
         } catch (IOException e) {
             throw new ApiException(e);
@@ -471,7 +418,7 @@ public class SearchPermissionApi {
 
         HttpRequest.Builder localVarRequestBuilder = HttpRequest.newBuilder();
 
-        String localVarPath = "/api/v2/permissions/query/subunits/grants";
+        String localVarPath = PERMISSION_SEARCH_SUBUNIT_GRANT.getUrl();
 
         List<Pair> localVarQueryParams = new ArrayList<>();
         StringJoiner localVarQueryStringJoiner = new StringJoiner("&");
@@ -484,7 +431,7 @@ public class SearchPermissionApi {
             if (localVarQueryStringJoiner.length() != 0) {
                 queryJoiner.add(localVarQueryStringJoiner.toString());
             }
-            localVarRequestBuilder.uri(URI.create(memberVarBaseUri + localVarPath + '?' + queryJoiner.toString()));
+            localVarRequestBuilder.uri(URI.create(memberVarBaseUri + localVarPath + '?' + queryJoiner));
         } else {
             localVarRequestBuilder.uri(URI.create(memberVarBaseUri + localVarPath));
         }
@@ -506,5 +453,4 @@ public class SearchPermissionApi {
         }
         return localVarRequestBuilder;
     }
-
 }

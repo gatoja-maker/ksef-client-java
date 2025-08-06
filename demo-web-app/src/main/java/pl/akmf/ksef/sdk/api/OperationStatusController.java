@@ -18,7 +18,7 @@ public class OperationStatusController {
 
     @GetMapping("{referenceNumber}/status")
     public PermissionStatusInfo getOperationStatusAsync(@PathVariable String referenceNumber) throws ApiException {
-        var statusInfo = ksefClient.operations(referenceNumber);
+        var statusInfo = ksefClient.permissionOperationStatus(referenceNumber);
 
         log.info("response " + statusInfo);
         return statusInfo;

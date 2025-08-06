@@ -18,6 +18,9 @@ import java.io.IOException;
 import java.time.OffsetDateTime;
 import java.util.List;
 
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.awaitility.Awaitility.await;
+
 class CertificateIntegrationTest extends BaseIntegrationTest {
 
     @Test
@@ -31,7 +34,10 @@ class CertificateIntegrationTest extends BaseIntegrationTest {
 
         var referenceNumber = sendEnrollment(enrollmentInfo);
 
-        Thread.sleep(10000);
+        await().atMost(30, SECONDS)
+                .pollInterval(2, SECONDS)
+                .until(() -> isEnrolmentStatusReady(referenceNumber));
+
         var enrolmentStatus = getEnrolmentStatus(referenceNumber);
 
         getCertificateList(enrolmentStatus.getCertificateSerialNumber());
@@ -39,6 +45,16 @@ class CertificateIntegrationTest extends BaseIntegrationTest {
         revokeCertificate(enrolmentStatus.getCertificateSerialNumber());
 
         getMedataCertificateList(enrolmentStatus.getCertificateSerialNumber());
+    }
+
+    private Boolean isEnrolmentStatusReady(String referenceNumber) {
+        try {
+            var response = defaultKsefClient.getCertificateEnrollmentStatus(referenceNumber);
+            return response != null &&
+                    response.getStatus().getCode() == 200;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private void getMedataCertificateList(String certificateSerialNumber) throws ApiException {

@@ -10,11 +10,12 @@ public class PersonPermissionsQueryRequest {
     private PersonPermissionsTargetIdentifier targetIdentifier;
     private List<PersonPermissionType> permissionTypes;
     private PermissionState permissionState;
+    private PersonPermissionQueryType queryType;
 
     public PersonPermissionsQueryRequest() {
     }
 
-    public PersonPermissionsQueryRequest(PersonPermissionsAuthorIdentifier authorIdentifier, PersonPermissionsAuthorizedIdentifier authorizedIdentifier, PersonPermissionsTargetIdentifier targetIdentifier, List<PersonPermissionType> permissionTypes, PermissionState permissionState) {
+    public PersonPermissionsQueryRequest(PersonPermissionsAuthorIdentifier authorIdentifier, PersonPermissionsAuthorizedIdentifier authorizedIdentifier, PersonPermissionsTargetIdentifier targetIdentifier, List<PersonPermissionType> permissionTypes, PermissionState permissionState, PersonPermissionQueryType queryType) {
         this.authorIdentifier = authorIdentifier;
         this.authorizedIdentifier = authorizedIdentifier;
         this.targetIdentifier = targetIdentifier;
@@ -60,6 +61,14 @@ public class PersonPermissionsQueryRequest {
 
     public void setPermissionState(PermissionState permissionState) {
         this.permissionState = permissionState;
+    }
+
+    public PersonPermissionQueryType getQueryType() {
+        return queryType;
+    }
+
+    public void setQueryType(PersonPermissionQueryType queryType) {
+        this.queryType = queryType;
     }
 }
 

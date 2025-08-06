@@ -16,7 +16,6 @@ import pl.akmf.ksef.sdk.client.model.invoice.QueryInvoicesReponse;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
@@ -25,38 +24,24 @@ import java.util.List;
 import java.util.StringJoiner;
 import java.util.function.Consumer;
 
-public class DownloadInvoiceApi {
-    private final HttpClient memberVarHttpClient;
+import static pl.akmf.ksef.sdk.api.Url.INVOICE_DOWNLOAD;
+import static pl.akmf.ksef.sdk.api.Url.INVOICE_DOWNLOAD_BY_KSEF;
+import static pl.akmf.ksef.sdk.api.Url.INVOICE_QUERY;
+import static pl.akmf.ksef.sdk.api.Url.INVOICE_QUERY_ASYNC;
+import static pl.akmf.ksef.sdk.api.Url.INVOICE_QUERY_STATUS;
+
+public class DownloadInvoiceApi extends BaseApi {
     private final ObjectMapper memberVarObjectMapper;
     private final String memberVarBaseUri;
     private final Consumer<HttpRequest.Builder> memberVarInterceptor;
     private final Duration memberVarReadTimeout;
-    private final Consumer<HttpResponse<InputStream>> memberVarResponseInterceptor;
-
-    public DownloadInvoiceApi() {
-        this(new ApiClient());
-    }
 
     public DownloadInvoiceApi(ApiClient apiClient) {
-        memberVarHttpClient = apiClient.getHttpClient();
+        super(apiClient.getHttpClient(), apiClient.getResponseInterceptor());
         memberVarObjectMapper = apiClient.getObjectMapper();
         memberVarBaseUri = apiClient.getBaseUri();
         memberVarInterceptor = apiClient.getRequestInterceptor();
         memberVarReadTimeout = apiClient.getReadTimeout();
-        memberVarResponseInterceptor = apiClient.getResponseInterceptor();
-    }
-
-    protected ApiException getApiException(String operationId, HttpResponse<InputStream> response) throws IOException {
-        String body = response.body() == null ? null : new String(response.body().readAllBytes());
-        String message = formatExceptionMessage(operationId, response.statusCode(), body);
-        return new ApiException(response.statusCode(), message, response.headers(), body);
-    }
-
-    private String formatExceptionMessage(String operationId, int statusCode, String body) {
-        if (body == null || body.isEmpty()) {
-            body = "[no body]";
-        }
-        return operationId + " call failed with: " + statusCode + " - " + body;
     }
 
     /**
@@ -70,20 +55,12 @@ public class DownloadInvoiceApi {
     public ApiResponse<String> apiV2InvoicesKsefKsefReferenceNumberGet(String ksefReferenceNumber) throws ApiException {
         HttpRequest.Builder localVarRequestBuilder = apiV2InvoicesKsefKsefReferenceNumberGetRequestBuilder(ksefReferenceNumber);
         try {
-            HttpResponse<InputStream> localVarResponse = memberVarHttpClient.send(
-                    localVarRequestBuilder.build(),
-                    HttpResponse.BodyHandlers.ofInputStream());
-            if (memberVarResponseInterceptor != null) {
-                memberVarResponseInterceptor.accept(localVarResponse);
-            }
-            if (localVarResponse.statusCode() / 100 != 2) {
-                throw getApiException("apiV2InvoicesKsefKsefReferenceNumberGet", localVarResponse);
-            }
+            HttpResponse<InputStream> localVarResponse = getInputStreamHttpResponse(localVarRequestBuilder, INVOICE_DOWNLOAD_BY_KSEF.getOperationId());
             return new ApiResponse<>(
                     localVarResponse.statusCode(),
                     localVarResponse.headers().map(),
                     localVarResponse.body() == null ? null : memberVarObjectMapper.readValue(localVarResponse.body(), new TypeReference<>() {
-                    }) // closes the InputStream
+                    })
             );
         } catch (IOException e) {
             throw new ApiException(e);
@@ -94,14 +71,13 @@ public class DownloadInvoiceApi {
     }
 
     private HttpRequest.Builder apiV2InvoicesKsefKsefReferenceNumberGetRequestBuilder(String ksefReferenceNumber) throws ApiException {
-        // verify the required parameter 'ksefReferenceNumber' is set
         if (ksefReferenceNumber == null) {
             throw new ApiException(400, "Missing the required parameter 'ksefReferenceNumber' when calling apiV2InvoicesKsefKsefReferenceNumberGet");
         }
 
         HttpRequest.Builder localVarRequestBuilder = HttpRequest.newBuilder();
 
-        String localVarPath = "/api/v2/invoices/ksef/{ksefReferenceNumber}"
+        String localVarPath = INVOICE_DOWNLOAD_BY_KSEF.getUrl()
                 .replace("{ksefReferenceNumber}", ApiClient.urlEncode(ksefReferenceNumber));
 
         localVarRequestBuilder.uri(URI.create(memberVarBaseUri + localVarPath));
@@ -130,20 +106,13 @@ public class DownloadInvoiceApi {
     public ApiResponse<AsyncInvoicesQueryStatus> apiV2InvoicesAsyncQueryOperationReferenceNumberGet(String operationReferenceNumber) throws ApiException {
         HttpRequest.Builder localVarRequestBuilder = apiV2InvoicesAsyncQueryOperationReferenceNumberGetRequestBuilder(operationReferenceNumber);
         try {
-            HttpResponse<InputStream> localVarResponse = memberVarHttpClient.send(
-                    localVarRequestBuilder.build(),
-                    HttpResponse.BodyHandlers.ofInputStream());
-            if (memberVarResponseInterceptor != null) {
-                memberVarResponseInterceptor.accept(localVarResponse);
-            }
-            if (localVarResponse.statusCode() / 100 != 2) {
-                throw getApiException("apiV2InvoicesAsyncQueryOperationReferenceNumberGet", localVarResponse);
-            }
+            HttpResponse<InputStream> localVarResponse = getInputStreamHttpResponse(localVarRequestBuilder, INVOICE_QUERY_STATUS.getOperationId());
+
             return new ApiResponse<>(
                     localVarResponse.statusCode(),
                     localVarResponse.headers().map(),
                     localVarResponse.body() == null ? null : memberVarObjectMapper.readValue(localVarResponse.body(), new TypeReference<>() {
-                    }) // closes the InputStream
+                    })
             );
 
         } catch (IOException e) {
@@ -155,15 +124,14 @@ public class DownloadInvoiceApi {
     }
 
     private HttpRequest.Builder apiV2InvoicesAsyncQueryOperationReferenceNumberGetRequestBuilder(String operationReferenceNumber) throws ApiException {
-        // verify the required parameter 'operationReferenceNumber' is set
         if (operationReferenceNumber == null) {
             throw new ApiException(400, "Missing the required parameter 'operationReferenceNumber' when calling apiV2InvoicesAsyncQueryOperationReferenceNumberGet");
         }
 
         HttpRequest.Builder localVarRequestBuilder = HttpRequest.newBuilder();
 
-        String localVarPath = "/api/v2/invoices/async-query/{operationReferenceNumber}"
-                .replace("{operationReferenceNumber}", ApiClient.urlEncode(operationReferenceNumber.toString()));
+        String localVarPath = INVOICE_QUERY_STATUS.getUrl()
+                .replace("{operationReferenceNumber}", ApiClient.urlEncode(operationReferenceNumber));
 
         localVarRequestBuilder.uri(URI.create(memberVarBaseUri + localVarPath));
 
@@ -191,20 +159,13 @@ public class DownloadInvoiceApi {
     public ApiResponse<InitAsyncInvoicesQueryResponse> apiV2InvoicesAsyncQueryPost(InvoicesAsynqQueryRequest invoicesAsynqQueryRequest) throws ApiException {
         HttpRequest.Builder localVarRequestBuilder = apiV2InvoicesAsyncQueryPostRequestBuilder(invoicesAsynqQueryRequest);
         try {
-            HttpResponse<InputStream> localVarResponse = memberVarHttpClient.send(
-                    localVarRequestBuilder.build(),
-                    HttpResponse.BodyHandlers.ofInputStream());
-            if (memberVarResponseInterceptor != null) {
-                memberVarResponseInterceptor.accept(localVarResponse);
-            }
-            if (localVarResponse.statusCode() / 100 != 2) {
-                throw getApiException("apiV2InvoicesAsyncQueryPost", localVarResponse);
-            }
+            HttpResponse<InputStream> localVarResponse = getInputStreamHttpResponse(localVarRequestBuilder, INVOICE_QUERY_ASYNC.getOperationId());
+
             return new ApiResponse<>(
                     localVarResponse.statusCode(),
                     localVarResponse.headers().map(),
                     localVarResponse.body() == null ? null : memberVarObjectMapper.readValue(localVarResponse.body(), new TypeReference<>() {
-                    }) // closes the InputStream
+                    })
             );
         } catch (IOException e) {
             throw new ApiException(e);
@@ -218,7 +179,7 @@ public class DownloadInvoiceApi {
 
         HttpRequest.Builder localVarRequestBuilder = HttpRequest.newBuilder();
 
-        String localVarPath = "/api/v2/invoices/async-query";
+        String localVarPath = INVOICE_QUERY_ASYNC.getUrl();
 
         localVarRequestBuilder.uri(URI.create(memberVarBaseUri + localVarPath));
 
@@ -241,9 +202,8 @@ public class DownloadInvoiceApi {
     }
 
 
-
     /**
-     * [mock]Pobranie faktury  na podstawie numeru KSeF oraz danych faktury
+     * Pobranie faktury  na podstawie numeru KSeF oraz danych faktury
      * Faktura zostanie zwrócona wyłącznie, jeśli wszystkie dane wejściowe są zgodne z danymi faktury w systemie.
      *
      * @param downloadInvoiceRequest (optional)
@@ -253,20 +213,13 @@ public class DownloadInvoiceApi {
     public ApiResponse<String> apiV2InvoicesDownloadPost(DownloadInvoiceRequest downloadInvoiceRequest) throws ApiException {
         HttpRequest.Builder localVarRequestBuilder = apiV2InvoicesDownloadPostRequestBuilder(downloadInvoiceRequest);
         try {
-            HttpResponse<InputStream> localVarResponse = memberVarHttpClient.send(
-                    localVarRequestBuilder.build(),
-                    HttpResponse.BodyHandlers.ofInputStream());
-            if (memberVarResponseInterceptor != null) {
-                memberVarResponseInterceptor.accept(localVarResponse);
-            }
-            if (localVarResponse.statusCode() / 100 != 2) {
-                throw getApiException("apiV2InvoicesDownloadPost", localVarResponse);
-            }
+            HttpResponse<InputStream> localVarResponse = getInputStreamHttpResponse(localVarRequestBuilder, INVOICE_DOWNLOAD.getOperationId());
+
             return new ApiResponse<>(
                     localVarResponse.statusCode(),
                     localVarResponse.headers().map(),
                     localVarResponse.body() == null ? null : memberVarObjectMapper.readValue(localVarResponse.body(), new TypeReference<>() {
-                    }) // closes the InputStream
+                    })
             );
         } catch (IOException e) {
             throw new ApiException(e);
@@ -280,7 +233,7 @@ public class DownloadInvoiceApi {
 
         HttpRequest.Builder localVarRequestBuilder = HttpRequest.newBuilder();
 
-        String localVarPath = "/api/v2/invoices/download";
+        String localVarPath = INVOICE_DOWNLOAD.getUrl();
 
         localVarRequestBuilder.uri(URI.create(memberVarBaseUri + localVarPath));
 
@@ -303,8 +256,6 @@ public class DownloadInvoiceApi {
     }
 
 
-
-
     /**
      * [mock] Pobranie listy metadanych faktur
      * Zwraca listę metadanych faktur spełniające podane kryteria wyszukiwania.
@@ -318,21 +269,14 @@ public class DownloadInvoiceApi {
     public ApiResponse<QueryInvoicesReponse> apiV2InvoicesQueryPost(Integer pageOffset, Integer pageSize, InvoicesQueryRequest invoicesQueryRequest) throws ApiException {
         HttpRequest.Builder localVarRequestBuilder = apiV2InvoicesQueryPostRequestBuilder(pageOffset, pageSize, invoicesQueryRequest);
         try {
-            HttpResponse<InputStream> localVarResponse = memberVarHttpClient.send(
-                    localVarRequestBuilder.build(),
-                    HttpResponse.BodyHandlers.ofInputStream());
-            if (memberVarResponseInterceptor != null) {
-                memberVarResponseInterceptor.accept(localVarResponse);
-            }
-                if (localVarResponse.statusCode() / 100 != 2) {
-                    throw getApiException("apiV2InvoicesQueryPost", localVarResponse);
-                }
-                return new ApiResponse<>(
-                        localVarResponse.statusCode(),
-                        localVarResponse.headers().map(),
-                        localVarResponse.body() == null ? null : memberVarObjectMapper.readValue(localVarResponse.body(), new TypeReference<>() {
-                        }) // closes the InputStream
-                );
+            HttpResponse<InputStream> localVarResponse = getInputStreamHttpResponse(localVarRequestBuilder, INVOICE_QUERY.getOperationId());
+
+            return new ApiResponse<>(
+                    localVarResponse.statusCode(),
+                    localVarResponse.headers().map(),
+                    localVarResponse.body() == null ? null : memberVarObjectMapper.readValue(localVarResponse.body(), new TypeReference<>() {
+                    })
+            );
         } catch (IOException e) {
             throw new ApiException(e);
         } catch (InterruptedException e) {
@@ -345,7 +289,7 @@ public class DownloadInvoiceApi {
 
         HttpRequest.Builder localVarRequestBuilder = HttpRequest.newBuilder();
 
-        String localVarPath = "/api/v2/invoices/query";
+        String localVarPath = INVOICE_QUERY.getUrl();
 
         List<Pair> localVarQueryParams = new ArrayList<>();
         StringJoiner localVarQueryStringJoiner = new StringJoiner("&");
@@ -380,6 +324,4 @@ public class DownloadInvoiceApi {
         }
         return localVarRequestBuilder;
     }
-
-
 }

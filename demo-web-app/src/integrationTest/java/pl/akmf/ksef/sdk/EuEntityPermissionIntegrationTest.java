@@ -6,33 +6,49 @@ import org.junit.jupiter.api.Test;
 import pl.akmf.ksef.sdk.api.builders.permission.euentity.EuEntityPermissionsQueryRequestBuilder;
 import pl.akmf.ksef.sdk.api.builders.permission.euentity.GrantEUEntityPermissionsRequestBuilder;
 import pl.akmf.ksef.sdk.client.model.ApiException;
+import pl.akmf.ksef.sdk.client.model.permission.PermissionStatusInfo;
 import pl.akmf.ksef.sdk.client.model.permission.euentity.ContextIdentifier;
 import pl.akmf.ksef.sdk.client.model.permission.euentity.ContextIdentifierType;
 import pl.akmf.ksef.sdk.client.model.permission.euentity.SubjectIdentifier;
 import pl.akmf.ksef.sdk.client.model.permission.euentity.SubjectIdentifierType;
+import pl.akmf.ksef.sdk.client.model.permission.search.EuEntityPermission;
 import pl.akmf.ksef.sdk.client.model.xml.ContextIdentifierTypeEnum;
 import pl.akmf.ksef.sdk.configuration.BaseIntegrationTest;
 
 import java.io.IOException;
+import java.util.List;
+
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.awaitility.Awaitility.await;
 
 class EuEntityPermissionIntegrationTest extends BaseIntegrationTest {
 
     @Test
-    void euEntityPermissionE2EIntegrationTest() throws JAXBException, IOException, InterruptedException, ApiException {
+    void euEntityPermissionE2EIntegrationTest() throws JAXBException, IOException, ApiException {
         String contextNip = TestUtils.generateRandomNIP();
         String subjectNip = TestUtils.generateRandomNIP();
         authWithCustomNip(contextNip, ContextIdentifierTypeEnum.NIP, contextNip);
 
         var grantReferenceNumber = grantEuEntityPermission(subjectNip, contextNip);
 
-        Thread.sleep(5000);
+        await().atMost(5, SECONDS)
+                .pollInterval(1, SECONDS)
+                .until(() -> isOperationFinish(grantReferenceNumber));
 
-        checkPermissionStatus(grantReferenceNumber);
+        List<String> permission = checkPermission(subjectNip, 4);
 
-        checkGrantedPermission(subjectNip, 4);
+        permission.forEach(e -> {
+            var revokeReferenceNumber = revokePermission(e);
+
+            await().atMost(30, SECONDS)
+                    .pollInterval(2, SECONDS)
+                    .until(() -> isOperationFinish(revokeReferenceNumber));
+        });
+
+        checkPermission(subjectNip, 0);
     }
 
-    private void checkGrantedPermission(String subjectContext, int expectedNumber) throws ApiException {
+    private List<String> checkPermission(String subjectContext, int expectedNumber) throws ApiException {
         var request = new EuEntityPermissionsQueryRequestBuilder()
                 .withAuthorizedFingerprintIdentifier(subjectContext)
                 .build();
@@ -40,6 +56,20 @@ class EuEntityPermissionIntegrationTest extends BaseIntegrationTest {
         var response = defaultKsefClient.searchGrantedEuEntityPermissions(request, 0, 10);
 
         Assertions.assertEquals(expectedNumber, response.getPermissions().size());
+
+        return response.getPermissions()
+                .stream()
+                .map(EuEntityPermission::getId)
+                .toList();
+    }
+
+    private String revokePermission(String operationId) {
+        try {
+            return defaultKsefClient.revokeCommonPermission(operationId).getOperationReferenceNumber();
+        } catch (ApiException e) {
+            Assertions.fail(e.getMessage());
+        }
+        return null;
     }
 
     private String grantEuEntityPermission(String subjectNip, String euContext) throws ApiException {
@@ -56,10 +86,8 @@ class EuEntityPermissionIntegrationTest extends BaseIntegrationTest {
         return response.getOperationReferenceNumber();
     }
 
-    private void checkPermissionStatus(String referenceNumber) throws ApiException {
-        var status = defaultKsefClient.operations(referenceNumber);
-
-        Assertions.assertNotNull(status);
-        Assertions.assertEquals(200, status.getStatus().getCode());
+    private Boolean isOperationFinish(String referenceNumber) throws ApiException {
+        PermissionStatusInfo operations = defaultKsefClient.permissionOperationStatus(referenceNumber);
+        return operations != null && operations.getStatus().getCode() == 200;
     }
 }

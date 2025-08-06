@@ -12,6 +12,7 @@ import pl.akmf.ksef.sdk.client.model.session.FormCode;
 import pl.akmf.ksef.sdk.client.model.session.SessionInvoice;
 import pl.akmf.ksef.sdk.client.model.session.SessionInvoicesResponse;
 import pl.akmf.ksef.sdk.client.model.session.SessionStatusResponse;
+import pl.akmf.ksef.sdk.client.model.session.SystemCode;
 import pl.akmf.ksef.sdk.client.model.session.UpoPageResponse;
 import pl.akmf.ksef.sdk.client.model.session.online.OpenOnlineSessionResponse;
 import pl.akmf.ksef.sdk.client.model.session.online.SendInvoiceResponse;
@@ -20,16 +21,21 @@ import pl.akmf.ksef.sdk.configuration.BaseIntegrationTest;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.security.cert.CertificateException;
 import java.util.Base64;
+import java.util.Objects;
 import java.util.UUID;
+
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.awaitility.Awaitility.await;
 
 class OnlineSessionIntegrationTest extends BaseIntegrationTest {
 
     private EncryptionData encryptionData;
 
-    //TODO FAKTURY SIE NIE PRZETWARZAJĄ
     @Test
-    void onlineSessionE2EIntegrationTest() throws JAXBException, IOException, InterruptedException, ApiException {
+    void onlineSessionE2EIntegrationTest() throws JAXBException, IOException, ApiException, CertificateException {
         String contextNip = TestUtils.generateRandomNIP();
         authWithCustomNip(contextNip, ContextIdentifierTypeEnum.NIP, contextNip);
 
@@ -37,25 +43,133 @@ class OnlineSessionIntegrationTest extends BaseIntegrationTest {
         encryptionData = cryptographyService.getEncryptionData();
 
         // Step 1: Open session and return referenceNumber
-        String sessionReferenceNumber = openOnlineSession(encryptionData);
-        Thread.sleep(sleepTime);
+        String sessionReferenceNumber = openOnlineSession(encryptionData, SystemCode.FA_2, "1-0E", "FA");
+
+        // Wait for session to be ready
+        await().atMost(30, SECONDS)
+                .pollInterval(1, SECONDS)
+                .until(() -> isSessionInProgress(sessionReferenceNumber));
+
         // Step 2: Send invoice
-        sendInvoiceOnlineSession(TestUtils.generateRandomNIP(), sessionReferenceNumber, encryptionData, cryptographyService);
-        Thread.sleep(2000);
+        sendInvoiceOnlineSession(contextNip, sessionReferenceNumber, encryptionData, cryptographyService, "/xml/invoices/sample/invoice-template.xml");
+
+        // Wait for invoice to be processed
+        await().atMost(30, SECONDS)
+                .pollInterval(2, SECONDS)
+                .until(() -> isInvoicessInSessionProcessed(sessionReferenceNumber));
+
         // Step 3: Check status
         getOnlineSessionStatus(sessionReferenceNumber);
-        Thread.sleep(sleepTime);
+
+        // Wait before closing session
+        await().atMost(10, SECONDS)
+                .pollDelay(sleepTime, MILLISECONDS)
+                .until(() -> true);
+
         // Step 4: Close session
         closeOnlineSession(sessionReferenceNumber);
-        Thread.sleep(2000);
+
+        // Wait for session to be closed
+        await().atMost(30, SECONDS)
+                .pollInterval(2, SECONDS)
+                .until(() -> isSessionClosed(sessionReferenceNumber));
+
         // Step 5: Get documents
         String ksefNumber = getOnlineSessionDocuments(sessionReferenceNumber);
+
         // Step 6: Get status after close
         String upoReferenceNumber = getOnlineSessionStatusAfterCloseSession(sessionReferenceNumber);
+
         // Step 7: Get UPO
         getOnlineSessionInvoiceUpo(sessionReferenceNumber, ksefNumber);
+
         // Step 8: Get session UPO
         getOnlineSessionUpo(sessionReferenceNumber, upoReferenceNumber);
+    }
+
+    @Test
+    void onlineSessionV3E2EIntegrationTest() throws JAXBException, IOException, ApiException, CertificateException {
+        String contextNip = TestUtils.generateRandomNIP();
+        authWithCustomNip(contextNip, ContextIdentifierTypeEnum.NIP, contextNip);
+
+        var cryptographyService = new DefaultCryptographyService(defaultKsefClient);
+        encryptionData = cryptographyService.getEncryptionData();
+
+        // Step 1: Open session and return referenceNumber
+        String sessionReferenceNumber = openOnlineSession(encryptionData, SystemCode.FA_3, "1-0E", "FA");
+
+        // Wait for session to be ready
+        await().atMost(30, SECONDS)
+                .pollInterval(1, SECONDS)
+                .until(() -> isSessionInProgress(sessionReferenceNumber));
+
+        // Step 2: Send invoice
+        sendInvoiceOnlineSession(contextNip, sessionReferenceNumber, encryptionData, cryptographyService, "/xml/invoices/sample/invoice-template_v3.xml");
+
+        // Wait for invoice to be processed
+        await().atMost(30, SECONDS)
+                .pollInterval(2, SECONDS)
+                .until(() -> isInvoicessInSessionProcessed(sessionReferenceNumber));
+
+        // Step 3: Check status
+        getOnlineSessionStatus(sessionReferenceNumber);
+
+        // Wait before closing session
+        await().atMost(10, SECONDS)
+                .pollDelay(sleepTime, MILLISECONDS)
+                .until(() -> true);
+
+        // Step 4: Close session
+        closeOnlineSession(sessionReferenceNumber);
+
+        // Wait for session to be closed
+        await().atMost(30, SECONDS)
+                .pollInterval(2, SECONDS)
+                .until(() -> isSessionClosed(sessionReferenceNumber));
+
+        // Step 5: Get documents
+        String ksefNumber = getOnlineSessionDocuments(sessionReferenceNumber);
+
+        // Step 6: Get status after close
+        String upoReferenceNumber = getOnlineSessionStatusAfterCloseSession(sessionReferenceNumber);
+
+        // Step 7: Get UPO
+        getOnlineSessionInvoiceUpo(sessionReferenceNumber, ksefNumber);
+
+        // Step 8: Get session UPO
+        getOnlineSessionUpo(sessionReferenceNumber, upoReferenceNumber);
+    }
+
+    // Helper methods to check conditions
+    private boolean isSessionInProgress(String sessionReferenceNumber) {
+        try {
+            SessionStatusResponse statusResponse = defaultKsefClient.getSessionStatus(sessionReferenceNumber);
+            return statusResponse != null && statusResponse.getStatus() != null && (statusResponse.getStatus().getCode() == 100 || statusResponse.getStatus().getCode() == 300);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private boolean isInvoicessInSessionProcessed(String sessionReferenceNumber) {
+        try {
+            SessionStatusResponse statusResponse = defaultKsefClient.getSessionStatus(sessionReferenceNumber);
+            return statusResponse != null &&
+                    statusResponse.getSuccessfulInvoiceCount() != null &&
+                    statusResponse.getSuccessfulInvoiceCount() > 0;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private boolean isSessionClosed(String sessionReferenceNumber) {
+        try {
+            SessionStatusResponse statusResponse = defaultKsefClient.getSessionStatus(sessionReferenceNumber);
+            return statusResponse != null &&
+                    statusResponse.getStatus() != null &&
+                    statusResponse.getStatus().getCode() == 200;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private void getOnlineSessionStatus(String sessionReferenceNumber) throws ApiException {
@@ -83,9 +197,9 @@ class OnlineSessionIntegrationTest extends BaseIntegrationTest {
         return upoPageResponse.getReferenceNumber();
     }
 
-    private String openOnlineSession(EncryptionData encryptionData) throws ApiException {
+    private String openOnlineSession(EncryptionData encryptionData, SystemCode systemCode, String schemaVersion, String value) throws ApiException {
         var request = new OpenOnlineSessionRequestBuilder()
-                .withFormCode(new FormCode("FA (2)","1-0E","FA"))
+                .withFormCode(new FormCode(systemCode, schemaVersion, value))
                 .withEncryptionInfo(encryptionData.encryptionInfo())
                 .build();
 
@@ -95,8 +209,9 @@ class OnlineSessionIntegrationTest extends BaseIntegrationTest {
         return openOnlineSessionResponse.getReferenceNumber();
     }
 
-    private void sendInvoiceOnlineSession(String nip, String sessionReferenceNumber, EncryptionData encryptionData, DefaultCryptographyService cryptographyService) throws IOException, ApiException {
-        String invoiceTemplate = new String(BaseIntegrationTest.class.getResourceAsStream("/xml/invoices/sample/invoice-template.xml")
+    private void sendInvoiceOnlineSession(String nip, String sessionReferenceNumber, EncryptionData encryptionData,
+                                          DefaultCryptographyService cryptographyService, String path) throws IOException, ApiException {
+        String invoiceTemplate = new String(Objects.requireNonNull(BaseIntegrationTest.class.getResourceAsStream(path))
                 .readAllBytes(), StandardCharsets.UTF_8)
                 .replace("#nip#", nip)
                 .replace("#invoice_number#", UUID.randomUUID().toString());

@@ -1,24 +1,24 @@
 package pl.akmf.ksef.sdk.client.model.session;
 
 public class FormCode {
-    private String systemCode;
+    private SystemCode systemCode;
     private String schemaVersion;
     private String value;
 
     public FormCode() {
     }
 
-    public FormCode(String systemCode, String schemaVersion, String value) {
+    public FormCode(SystemCode systemCode, String schemaVersion, String value) {
         this.systemCode = systemCode;
         this.schemaVersion = schemaVersion;
         this.value = value;
     }
 
-    public String getSystemCode() {
+    public SystemCode getSystemCode() {
         return systemCode;
     }
 
-    public void setSystemCode(String systemCode) {
+    public void setSystemCode(SystemCode systemCode) {
         this.systemCode = systemCode;
     }
 

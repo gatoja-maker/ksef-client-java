@@ -7,7 +7,6 @@ public class CertificateInfo {
     private String name;
     private String commonName;
     private CertificateListItemStatus status;
-    private String thumbprint;
     private String subjectIdentifier;
     private String subjectIdentifierType;
     private OffsetDateTime validFrom;
@@ -48,14 +47,6 @@ public class CertificateInfo {
 
     public void setStatus(CertificateListItemStatus status) {
         this.status = status;
-    }
-
-    public String getThumbprint() {
-        return thumbprint;
-    }
-
-    public void setThumbprint(String thumbprint) {
-        this.thumbprint = thumbprint;
     }
 
     public String getSubjectIdentifier() {

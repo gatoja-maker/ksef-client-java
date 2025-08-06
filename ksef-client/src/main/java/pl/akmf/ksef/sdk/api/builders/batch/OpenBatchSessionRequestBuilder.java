@@ -2,12 +2,14 @@ package pl.akmf.ksef.sdk.api.builders.batch;
 
 import pl.akmf.ksef.sdk.client.model.session.EncryptionInfo;
 import pl.akmf.ksef.sdk.client.model.session.FormCode;
+import pl.akmf.ksef.sdk.client.model.session.SystemCode;
 import pl.akmf.ksef.sdk.client.model.session.batch.BatchFileInfo;
 import pl.akmf.ksef.sdk.client.model.session.batch.BatchFilePartInfo;
 import pl.akmf.ksef.sdk.client.model.session.batch.OpenBatchSessionRequest;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 public class OpenBatchSessionRequestBuilder {
 
@@ -25,8 +27,8 @@ public class OpenBatchSessionRequestBuilder {
         return new OpenBatchSessionRequestBuilder();
     }
 
-    public OpenBatchSessionRequestBuilder withFormCode(String systemCode, String schemaVersion, String value) {
-        if (isNullOrBlank(systemCode) || isNullOrBlank(schemaVersion) || isNullOrBlank(value)) {
+    public OpenBatchSessionRequestBuilder withFormCode(SystemCode systemCode, String schemaVersion, String value) {
+        if (Objects.isNull(systemCode) || isNullOrBlank(schemaVersion) || isNullOrBlank(value)) {
             throw new IllegalArgumentException("FormCode parameters cannot be null or empty.");
         }
 
@@ -37,14 +39,18 @@ public class OpenBatchSessionRequestBuilder {
         return this;
     }
 
-    public OpenBatchSessionRequestBuilder withBatchFile(long fileSize, String fileHash, boolean offlineMode) {
+    public OpenBatchSessionRequestBuilder withBatchFile(long fileSize, String fileHash) {
         if (fileSize < 0 || isNullOrBlank(fileHash)) {
             throw new IllegalArgumentException("BatchFile parameters are invalid.");
         }
 
-        this.offlineMode = offlineMode;
         this.batchFileSize = fileSize;
         this.batchFileHash = fileHash;
+        return this;
+    }
+
+    public OpenBatchSessionRequestBuilder withOfflineMode(boolean offlineMode) {
+        this.offlineMode = offlineMode;
         return this;
     }
 

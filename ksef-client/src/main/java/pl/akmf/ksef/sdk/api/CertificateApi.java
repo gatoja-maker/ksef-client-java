@@ -20,7 +20,6 @@ import pl.akmf.ksef.sdk.client.model.certificate.SendCertificateEnrollmentReques
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
@@ -29,34 +28,26 @@ import java.util.List;
 import java.util.StringJoiner;
 import java.util.function.Consumer;
 
-public class CertificateApi {
-    private final HttpClient memberVarHttpClient;
+import static pl.akmf.ksef.sdk.api.Url.CERTIFICATE_ENROLLMENT;
+import static pl.akmf.ksef.sdk.api.Url.CERTIFICATE_ENROLLMENT_DATA;
+import static pl.akmf.ksef.sdk.api.Url.CERTIFICATE_LIMIT;
+import static pl.akmf.ksef.sdk.api.Url.CERTIFICATE_METADATA;
+import static pl.akmf.ksef.sdk.api.Url.CERTIFICATE_RETRIEVE;
+import static pl.akmf.ksef.sdk.api.Url.CERTIFICATE_REVOKE;
+import static pl.akmf.ksef.sdk.api.Url.CERTIFICATE_STATUS;
+
+public class CertificateApi extends BaseApi {
     private final ObjectMapper memberVarObjectMapper;
     private final String memberVarBaseUri;
     private final Consumer<HttpRequest.Builder> memberVarInterceptor;
     private final Duration memberVarReadTimeout;
-    private final Consumer<HttpResponse<InputStream>> memberVarResponseInterceptor;
 
     public CertificateApi(ApiClient apiClient) {
-        memberVarHttpClient = apiClient.getHttpClient();
+        super(apiClient.getHttpClient(), apiClient.getResponseInterceptor());
         memberVarObjectMapper = apiClient.getObjectMapper();
         memberVarBaseUri = apiClient.getBaseUri();
         memberVarInterceptor = apiClient.getRequestInterceptor();
         memberVarReadTimeout = apiClient.getReadTimeout();
-        memberVarResponseInterceptor = apiClient.getResponseInterceptor();
-    }
-
-    protected ApiException getApiException(String operationId, HttpResponse<InputStream> response) throws IOException {
-        String body = response.body() == null ? null : new String(response.body().readAllBytes());
-        String message = formatExceptionMessage(operationId, response.statusCode(), body);
-        return new ApiException(response.statusCode(), message, response.headers(), body);
-    }
-
-    private String formatExceptionMessage(String operationId, int statusCode, String body) {
-        if (body == null || body.isEmpty()) {
-            body = "[no body]";
-        }
-        return operationId + " call failed with: " + statusCode + " - " + body;
     }
 
     /**
@@ -71,22 +62,7 @@ public class CertificateApi {
                                                                                CertificateRevokeRequest certificateRevokeRequest) throws ApiException {
         HttpRequest.Builder localVarRequestBuilder = apiV2CertificatesCertificateSerialNumberRevokePostRequestBuilder(certificateSerialNumber, certificateRevokeRequest);
         try {
-            HttpResponse<InputStream> localVarResponse = memberVarHttpClient.send(
-                    localVarRequestBuilder.build(),
-                    HttpResponse.BodyHandlers.ofInputStream());
-            if (memberVarResponseInterceptor != null) {
-                memberVarResponseInterceptor.accept(localVarResponse);
-            }
-            try {
-                if (localVarResponse.statusCode() / 100 != 2) {
-                    throw getApiException("apiV2CertificatesCertificateSerialNumberRevokePost", localVarResponse);
-                }
-                localVarResponse.statusCode();
-                localVarResponse.headers();
-            } finally {
-                // Drain the InputStream
-                localVarResponse.body().close();
-            }
+            getInputStreamHttpResponse(localVarRequestBuilder, CERTIFICATE_REVOKE.getOperationId());
         } catch (IOException e) {
             throw new ApiException(e);
         } catch (InterruptedException e) {
@@ -97,14 +73,13 @@ public class CertificateApi {
 
     private HttpRequest.Builder apiV2CertificatesCertificateSerialNumberRevokePostRequestBuilder(String certificateSerialNumber,
                                                                                                  CertificateRevokeRequest certificateRevokeRequest) throws ApiException {
-        // verify the required parameter 'certificateSerialNumber' is set
         if (certificateSerialNumber == null) {
             throw new ApiException(400, "Missing the required parameter 'certificateSerialNumber' when calling apiV2CertificatesCertificateSerialNumberRevokePost");
         }
 
         HttpRequest.Builder localVarRequestBuilder = HttpRequest.newBuilder();
 
-        String localVarPath = "/api/v2/certificates/{certificateSerialNumber}/revoke"
+        String localVarPath = CERTIFICATE_REVOKE.getUrl()
                 .replace("{certificateSerialNumber}", ApiClient.urlEncode(certificateSerialNumber));
 
         localVarRequestBuilder.uri(URI.create(memberVarBaseUri + localVarPath));
@@ -137,20 +112,13 @@ public class CertificateApi {
     public ApiResponse<CertificateEnrollmentsInfoResponse> apiV2CertificatesEnrollmentsDataGetWithHttpInfo() throws ApiException {
         HttpRequest.Builder localVarRequestBuilder = apiV2CertificatesEnrollmentsDataGetRequestBuilder();
         try {
-            HttpResponse<InputStream> localVarResponse = memberVarHttpClient.send(
-                    localVarRequestBuilder.build(),
-                    HttpResponse.BodyHandlers.ofInputStream());
-            if (memberVarResponseInterceptor != null) {
-                memberVarResponseInterceptor.accept(localVarResponse);
-            }
-            if (localVarResponse.statusCode() / 100 != 2) {
-                throw getApiException("apiV2CertificatesEnrollmentsDataGet", localVarResponse);
-            }
+            HttpResponse<InputStream> localVarResponse = getInputStreamHttpResponse(localVarRequestBuilder, CERTIFICATE_ENROLLMENT_DATA.getOperationId());
+
             return new ApiResponse<>(
                     localVarResponse.statusCode(),
                     localVarResponse.headers().map(),
                     localVarResponse.body() == null ? null : memberVarObjectMapper.readValue(localVarResponse.body(), new TypeReference<>() {
-                    }) // closes the InputStream
+                    })
             );
         } catch (IOException e) {
             throw new ApiException(e);
@@ -164,7 +132,7 @@ public class CertificateApi {
 
         HttpRequest.Builder localVarRequestBuilder = HttpRequest.newBuilder();
 
-        String localVarPath = "/api/v2/certificates/enrollments/data";
+        String localVarPath = CERTIFICATE_ENROLLMENT_DATA.getUrl();
 
         localVarRequestBuilder.uri(URI.create(memberVarBaseUri + localVarPath));
 
@@ -191,20 +159,14 @@ public class CertificateApi {
     public ApiResponse<CertificateEnrollmentResponse> apiV2CertificatesEnrollmentsPostWithHttpInfo(SendCertificateEnrollmentRequest enrollCertificateRequest) throws ApiException {
         HttpRequest.Builder localVarRequestBuilder = apiV2CertificatesEnrollmentsPostRequestBuilder(enrollCertificateRequest);
         try {
-            HttpResponse<InputStream> localVarResponse = memberVarHttpClient.send(
-                    localVarRequestBuilder.build(),
-                    HttpResponse.BodyHandlers.ofInputStream());
-            if (memberVarResponseInterceptor != null) {
-                memberVarResponseInterceptor.accept(localVarResponse);
-            }
-            if (localVarResponse.statusCode() / 100 != 2) {
-                throw getApiException("apiV2CertificatesEnrollmentsPost", localVarResponse);
-            }
+            HttpResponse<InputStream> localVarResponse = getInputStreamHttpResponse(localVarRequestBuilder,
+                    CERTIFICATE_ENROLLMENT.getOperationId());
+
             return new ApiResponse<>(
                     localVarResponse.statusCode(),
                     localVarResponse.headers().map(),
                     localVarResponse.body() == null ? null : memberVarObjectMapper.readValue(localVarResponse.body(), new TypeReference<>() {
-                    }) // closes the InputStream
+                    })
             );
         } catch (IOException e) {
             throw new ApiException(e);
@@ -218,7 +180,7 @@ public class CertificateApi {
 
         HttpRequest.Builder localVarRequestBuilder = HttpRequest.newBuilder();
 
-        String localVarPath = "/api/v2/certificates/enrollments";
+        String localVarPath = CERTIFICATE_ENROLLMENT.getUrl();
 
         localVarRequestBuilder.uri(URI.create(memberVarBaseUri + localVarPath));
 
@@ -251,20 +213,13 @@ public class CertificateApi {
     public ApiResponse<CertificateEnrollmentStatusResponse> apiV2CertificatesEnrollmentsReferenceNumberGetWithHttpInfo(String referenceNumber) throws ApiException {
         HttpRequest.Builder localVarRequestBuilder = apiV2CertificatesEnrollmentsReferenceNumberGetRequestBuilder(referenceNumber);
         try {
-            HttpResponse<InputStream> localVarResponse = memberVarHttpClient.send(
-                    localVarRequestBuilder.build(),
-                    HttpResponse.BodyHandlers.ofInputStream());
-            if (memberVarResponseInterceptor != null) {
-                memberVarResponseInterceptor.accept(localVarResponse);
-            }
-            if (localVarResponse.statusCode() / 100 != 2) {
-                throw getApiException("apiV2CertificatesEnrollmentsReferenceNumberGet", localVarResponse);
-            }
+            HttpResponse<InputStream> localVarResponse = getInputStreamHttpResponse(localVarRequestBuilder, CERTIFICATE_STATUS.getOperationId());
+
             return new ApiResponse<>(
                     localVarResponse.statusCode(),
                     localVarResponse.headers().map(),
                     localVarResponse.body() == null ? null : memberVarObjectMapper.readValue(localVarResponse.body(), new TypeReference<>() {
-                    }) // closes the InputStream
+                    })
             );
         } catch (IOException e) {
             throw new ApiException(e);
@@ -275,14 +230,13 @@ public class CertificateApi {
     }
 
     private HttpRequest.Builder apiV2CertificatesEnrollmentsReferenceNumberGetRequestBuilder(String referenceNumber) throws ApiException {
-        // verify the required parameter 'referenceNumber' is set
         if (referenceNumber == null) {
             throw new ApiException(400, "Missing the required parameter 'referenceNumber' when calling apiV2CertificatesEnrollmentsReferenceNumberGet");
         }
 
         HttpRequest.Builder localVarRequestBuilder = HttpRequest.newBuilder();
 
-        String localVarPath = "/api/v2/certificates/enrollments/{referenceNumber}"
+        String localVarPath = CERTIFICATE_STATUS.getUrl()
                 .replace("{referenceNumber}", ApiClient.urlEncode(referenceNumber));
 
         localVarRequestBuilder.uri(URI.create(memberVarBaseUri + localVarPath));
@@ -309,20 +263,13 @@ public class CertificateApi {
     public ApiResponse<CertificateLimitsResponse> apiV2CertificatesLimitsGetWithHttpInfo() throws ApiException {
         HttpRequest.Builder localVarRequestBuilder = apiV2CertificatesLimitsGetRequestBuilder();
         try {
-            HttpResponse<InputStream> localVarResponse = memberVarHttpClient.send(
-                    localVarRequestBuilder.build(),
-                    HttpResponse.BodyHandlers.ofInputStream());
-            if (memberVarResponseInterceptor != null) {
-                memberVarResponseInterceptor.accept(localVarResponse);
-            }
-            if (localVarResponse.statusCode() / 100 != 2) {
-                throw getApiException("apiV2CertificatesLimitsGet", localVarResponse);
-            }
+            HttpResponse<InputStream> localVarResponse = getInputStreamHttpResponse(localVarRequestBuilder, CERTIFICATE_LIMIT.getOperationId());
+
             return new ApiResponse<>(
                     localVarResponse.statusCode(),
                     localVarResponse.headers().map(),
                     localVarResponse.body() == null ? null : memberVarObjectMapper.readValue(localVarResponse.body(), new TypeReference<>() {
-                    }) // closes the InputStream
+                    })
             );
         } catch (IOException e) {
             throw new ApiException(e);
@@ -336,7 +283,7 @@ public class CertificateApi {
 
         HttpRequest.Builder localVarRequestBuilder = HttpRequest.newBuilder();
 
-        String localVarPath = "/api/v2/certificates/limits";
+        String localVarPath = CERTIFICATE_LIMIT.getUrl();
 
         localVarRequestBuilder.uri(URI.create(memberVarBaseUri + localVarPath));
 
@@ -365,20 +312,13 @@ public class CertificateApi {
     public ApiResponse<CertificateMetadataListResponse> apiV2CertificatesQueryPostWithHttpInfo(Integer pageSize, Integer pageOffset, CertificateMetadataListRequest certificateMetadataListRequest) throws ApiException {
         HttpRequest.Builder localVarRequestBuilder = apiV2CertificatesQueryPostRequestBuilder(pageSize, pageOffset, certificateMetadataListRequest);
         try {
-            HttpResponse<InputStream> localVarResponse = memberVarHttpClient.send(
-                    localVarRequestBuilder.build(),
-                    HttpResponse.BodyHandlers.ofInputStream());
-            if (memberVarResponseInterceptor != null) {
-                memberVarResponseInterceptor.accept(localVarResponse);
-            }
-            if (localVarResponse.statusCode() / 100 != 2) {
-                throw getApiException("apiV2CertificatesQueryPost", localVarResponse);
-            }
+            HttpResponse<InputStream> localVarResponse = getInputStreamHttpResponse(localVarRequestBuilder, CERTIFICATE_METADATA.getOperationId());
+
             return new ApiResponse<>(
                     localVarResponse.statusCode(),
                     localVarResponse.headers().map(),
                     localVarResponse.body() == null ? null : memberVarObjectMapper.readValue(localVarResponse.body(), new TypeReference<>() {
-                    }) // closes the InputStream
+                    })
             );
         } catch (IOException e) {
             throw new ApiException(e);
@@ -389,10 +329,9 @@ public class CertificateApi {
     }
 
     private HttpRequest.Builder apiV2CertificatesQueryPostRequestBuilder(Integer pageSize, Integer pageOffset, CertificateMetadataListRequest certificateMetadataListRequest) throws ApiException {
-
         HttpRequest.Builder localVarRequestBuilder = HttpRequest.newBuilder();
 
-        String localVarPath = "/api/v2/certificates/query";
+        String localVarPath = CERTIFICATE_METADATA.getUrl();
 
         List<Pair> localVarQueryParams = new ArrayList<>();
         StringJoiner localVarQueryStringJoiner = new StringJoiner("&");
@@ -439,20 +378,13 @@ public class CertificateApi {
     public ApiResponse<CertificateListResponse> apiV2CertificatesRetrievePostWithHttpInfo(CertificateListRequest certificateListRequest) throws ApiException {
         HttpRequest.Builder localVarRequestBuilder = apiV2CertificatesRetrievePostRequestBuilder(certificateListRequest);
         try {
-            HttpResponse<InputStream> localVarResponse = memberVarHttpClient.send(
-                    localVarRequestBuilder.build(),
-                    HttpResponse.BodyHandlers.ofInputStream());
-            if (memberVarResponseInterceptor != null) {
-                memberVarResponseInterceptor.accept(localVarResponse);
-            }
-            if (localVarResponse.statusCode() / 100 != 2) {
-                throw getApiException("apiV2CertificatesRetrievePost", localVarResponse);
-            }
+            HttpResponse<InputStream> localVarResponse = getInputStreamHttpResponse(localVarRequestBuilder, CERTIFICATE_RETRIEVE.getOperationId());
+
             return new ApiResponse<>(
                     localVarResponse.statusCode(),
                     localVarResponse.headers().map(),
                     localVarResponse.body() == null ? null : memberVarObjectMapper.readValue(localVarResponse.body(), new TypeReference<>() {
-                    }) // closes the InputStream
+                    })
             );
         } catch (IOException e) {
             throw new ApiException(e);
@@ -466,7 +398,7 @@ public class CertificateApi {
 
         HttpRequest.Builder localVarRequestBuilder = HttpRequest.newBuilder();
 
-        String localVarPath = "/api/v2/certificates/retrieve";
+        String localVarPath = CERTIFICATE_RETRIEVE.getUrl();
 
         localVarRequestBuilder.uri(URI.create(memberVarBaseUri + localVarPath));
 
@@ -487,5 +419,4 @@ public class CertificateApi {
         }
         return localVarRequestBuilder;
     }
-
 }

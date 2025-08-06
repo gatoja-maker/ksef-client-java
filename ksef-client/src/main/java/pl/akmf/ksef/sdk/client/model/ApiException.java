@@ -1,6 +1,9 @@
 package pl.akmf.ksef.sdk.client.model;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.http.HttpHeaders;
+import java.net.http.HttpResponse;
 
 public class ApiException extends Exception {
     private static final long serialVersionUID = -7789526261274021206L;
@@ -49,30 +52,28 @@ public class ApiException extends Exception {
         this.responseBody = responseBody;
     }
 
-    /**
-     * Get the HTTP status code.
-     *
-     * @return HTTP status code
-     */
     public int getCode() {
         return code;
     }
 
-    /**
-     * Get the HTTP response headers.
-     *
-     * @return Headers as an HttpHeaders object
-     */
     public HttpHeaders getResponseHeaders() {
         return responseHeaders;
     }
 
-    /**
-     * Get the HTTP response body.
-     *
-     * @return Response body in the form of string
-     */
     public String getResponseBody() {
         return responseBody;
+    }
+
+    public static ApiException getApiException(String operationId, HttpResponse<InputStream> response) throws IOException {
+        String body = response.body() == null ? null : new String(response.body().readAllBytes());
+        String message = formatExceptionMessage(operationId, response.statusCode(), body);
+        return new ApiException(response.statusCode(), message, response.headers(), body);
+    }
+
+    private static String formatExceptionMessage(String operationId, int statusCode, String body) {
+        if (body == null || body.isEmpty()) {
+            body = "[no body]";
+        }
+        return operationId + " call failed with: " + statusCode + " - " + body;
     }
 }

@@ -21,13 +21,17 @@ repositories {
     mavenCentral()
 }
 
+val bouncycastleVersion = 1.76
 val jacksonDatabindNullableVersion = "0.2.6"
 val jsr310Version = "2.15.2"
 val junitVersion = "4.4"
 val junitEngineVersion = "5.8.2"
 val jsxbVarsion = "4.0.5"
+val jaxbFluentApiVersion = 3.0
 val xjc by configurations.creating
 val xadesVersion = "6.0"
+val googleZxingCodeVersion = "3.5.3"
+val googleZxingJavaseVersion = "3.5.3"
 
 dependencies {
     // Validation
@@ -42,13 +46,17 @@ dependencies {
     testRuntimeOnly("org.junit.vintage:junit-vintage-engine:$junitEngineVersion")
 
     //xsd
-    xjc("org.jvnet.jaxb2_commons:jaxb2-fluent-api:3.0")
+    xjc("org.jvnet.jaxb2_commons:jaxb2-fluent-api:$jaxbFluentApiVersion")
     xjc("com.sun.xml.bind:jaxb-xjc:$jsxbVarsion")
     xjc("com.sun.xml.bind:jaxb-impl:$jsxbVarsion")
 
     //bouncycastle
-    implementation("org.bouncycastle:bcpkix-jdk18on:1.76")
-    implementation("org.bouncycastle:bcprov-jdk18on:1.76")
+    implementation("org.bouncycastle:bcpkix-jdk18on:$bouncycastleVersion")
+    implementation("org.bouncycastle:bcprov-jdk18on:$bouncycastleVersion")
+
+    //qr code
+    implementation("com.google.zxing:core:$googleZxingCodeVersion")
+    implementation("com.google.zxing:javase:$googleZxingJavaseVersion")
 }
 
 tasks.withType<Test> {

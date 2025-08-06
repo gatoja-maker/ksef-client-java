@@ -10,6 +10,7 @@ public class SessionInvoice {
     private String ksefNumber;
     private String referenceNumber;
     private String invoiceHash;
+    private String invoiceFileName;
     private OffsetDateTime receiveDate;
     private StatusInfo status;
 
@@ -55,6 +56,14 @@ public class SessionInvoice {
 
     public void setInvoiceHash(String invoiceHash) {
         this.invoiceHash = invoiceHash;
+    }
+
+    public String getInvoiceFileName() {
+        return invoiceFileName;
+    }
+
+    public void setInvoiceFileName(String invoiceFileName) {
+        this.invoiceFileName = invoiceFileName;
     }
 
     public OffsetDateTime getReceiveDate() {

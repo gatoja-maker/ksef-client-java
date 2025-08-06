@@ -1,5 +1,7 @@
 package pl.akmf.ksef.sdk.api.services;
 
+import org.apache.commons.lang3.StringUtils;
+import org.bouncycastle.asn1.ASN1Encoding;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x500.X500NameBuilder;
 import org.bouncycastle.asn1.x500.style.BCStyle;
@@ -9,12 +11,12 @@ import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.bouncycastle.pkcs.PKCS10CertificationRequestBuilder;
 import org.bouncycastle.pkcs.jcajce.JcaPKCS10CertificationRequestBuilder;
-import org.bouncycastle.util.io.pem.PemObject;
-import org.bouncycastle.util.io.pem.PemReader;
 import pl.akmf.ksef.sdk.client.interfaces.CryptographyService;
 import pl.akmf.ksef.sdk.client.model.ApiException;
 import pl.akmf.ksef.sdk.client.model.certificate.CertificateEnrollmentsInfoResponse;
 import pl.akmf.ksef.sdk.client.model.certificate.CsrResult;
+import pl.akmf.ksef.sdk.client.model.certificate.publickey.PublicKeyCertificate;
+import pl.akmf.ksef.sdk.client.model.certificate.publickey.PublicKeyCertificateUsage;
 import pl.akmf.ksef.sdk.client.model.session.EncryptionData;
 import pl.akmf.ksef.sdk.client.model.session.EncryptionInfo;
 import pl.akmf.ksef.sdk.client.model.session.FileMetadata;
@@ -23,13 +25,17 @@ import pl.akmf.ksef.sdk.system.SystemKSeFSDKException;
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.KeyAgreement;
 import javax.crypto.NoSuchPaddingException;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.OAEPParameterSpec;
 import javax.crypto.spec.PSource;
 import javax.crypto.spec.SecretKeySpec;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.StringReader;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
@@ -38,31 +44,58 @@ import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.SecureRandom;
+import java.security.cert.CertificateException;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
+import java.security.spec.ECGenParameterSpec;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.MGF1ParameterSpec;
-import java.security.spec.X509EncodedKeySpec;
+import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.Base64;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 
 public class DefaultCryptographyService implements CryptographyService {
-    public static final String AES_CBC_PKCS_5_PADDING = "AES/CBC/PKCS5Padding";
-    public static final String AES = "AES";
-    public static final String RSA = "RSA";
-    public static final String SHA_256_WITH_RSA = "SHA256withRSA";
-    public static final String SHA_256 = "SHA-256";
-    public static final String MGF_1 = "MGF1";
-    public static final String RSA_ECB_OAEPPADDING = "RSA/ECB/OAEPPadding";
-    private final DefaultKsefClient ksefClient;
+    private static final String AES_CBC_PKCS_5_PADDING = "AES/CBC/PKCS5Padding";
+    private static final String AES_GCM_NO_PADDING = "AES/GCM/NoPadding";
+    private static final String RSA_ECB_OAEPPADDING = "RSA/ECB/OAEPPadding";
+    private static final String AES = "AES";
+    private static final String RSA = "RSA";
+    private static final String SHA_256_WITH_RSA = "SHA256withRSA";
+    private static final String SHA_256 = "SHA-256";
+    private static final String ECDH = "ECDH";
+    private static final String MGF_1 = "MGF1";
+    private static final String EC = "EC";
+    private static final String SECP_256_R_1 = "secp256r1";
+    private static final int GCM_TAG_LENGTH = 128;
+    private static final int GCM_NONCE_LENGTH = 12;
+    private final String symmetricKeyEncryptionPem;
+    private final String ksefTokenPem;
 
-    public DefaultCryptographyService(DefaultKsefClient ksefClient) {
-        this.ksefClient = ksefClient;
+
+    public DefaultCryptographyService(DefaultKsefClient ksefClient) throws ApiException {
+        List<PublicKeyCertificate> publicKeyCertificates = ksefClient.retrievePublicKeyCertificate();
+
+        this.symmetricKeyEncryptionPem = publicKeyCertificates.stream()
+                .filter(c -> c.getUsage().contains(PublicKeyCertificateUsage.SYMMETRICKEYENCRYPTION))
+                .findFirst()
+                .map(PublicKeyCertificate::getCertificatePem)
+                .orElse(null);
+
+        this.ksefTokenPem = publicKeyCertificates.stream()
+                .filter(c -> c.getUsage().contains(PublicKeyCertificateUsage.KSEFTOKENENCRYPTION))
+                .min(Comparator.comparing(PublicKeyCertificate::getValidFrom))
+                .map(PublicKeyCertificate::getCertificatePem)
+                .orElse(null);
     }
 
     @Override
-    public EncryptionData getEncryptionData() throws SystemKSeFSDKException, ApiException {
-        byte[] publicKey = ksefClient.getPublicKey();
+    public EncryptionData getEncryptionData() throws SystemKSeFSDKException, CertificateException, IOException {
+        PublicKey publicKey = parsePublicKeyFromPem(this.symmetricKeyEncryptionPem);
 
         try {
             byte[] key = generateRandom256BitsKey();
@@ -84,10 +117,51 @@ public class DefaultCryptographyService implements CryptographyService {
     }
 
     @Override
-    public byte[] encryptKsefTokenWithRSAUsingPublicKey(byte[] content) throws SystemKSeFSDKException, ApiException {
-        byte[] publicKey = ksefClient.getPublicKey();
+    public byte[] encryptKsefTokenWithRSAUsingPublicKey(byte[] content) throws SystemKSeFSDKException, CertificateException, IOException {
+        PublicKey publicKey = parsePublicKeyFromPem(ksefTokenPem);
 
         return encryptWithRSAUsingPublicKey(content, publicKey);
+    }
+
+    @Override
+    public byte[] encryptWithECDsaUsingPublicKey(byte[] content) throws InvalidAlgorithmParameterException, NoSuchAlgorithmException, InvalidKeyException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException, CertificateException, IOException {
+        PublicKey publicKey = parsePublicKeyFromPem(ksefTokenPem);
+
+        // 1. Ephemeral EC keypair
+        KeyPairGenerator kpg = KeyPairGenerator.getInstance(EC);
+        kpg.initialize(new ECGenParameterSpec(SECP_256_R_1));
+        KeyPair ephemeralKeyPair = kpg.generateKeyPair();
+
+        // 2. ECDH: Derive shared secret
+        KeyAgreement keyAgreement = KeyAgreement.getInstance(ECDH);
+        keyAgreement.init(ephemeralKeyPair.getPrivate());
+        keyAgreement.doPhase(publicKey, true);
+        byte[] sharedSecret = keyAgreement.generateSecret();
+
+        // 3. AES key from sharedSecret
+        SecretKey aesKey = new SecretKeySpec(sharedSecret, 0, 16, AES);
+
+        // 4. AES-GCM encryption
+        byte[] nonce = new byte[GCM_NONCE_LENGTH];
+        SecureRandom random = new SecureRandom();
+        random.nextBytes(nonce);
+
+        Cipher cipher = Cipher.getInstance(AES_GCM_NO_PADDING);
+        GCMParameterSpec gcmSpec = new GCMParameterSpec(GCM_TAG_LENGTH, nonce);
+        cipher.init(Cipher.ENCRYPT_MODE, aesKey, gcmSpec);
+        byte[] ciphertextWithTag = cipher.doFinal(content);
+
+        // 5. Ephemeral public key export (X.509 format)
+        byte[] ephemeralPubEncoded = ephemeralKeyPair.getPublic().getEncoded();
+
+        // 6. Final format: [ephemeralPub || nonce || ciphertextWithTag]
+        ByteBuffer buffer = ByteBuffer.allocate(
+                ephemeralPubEncoded.length + nonce.length + ciphertextWithTag.length);
+        buffer.put(ephemeralPubEncoded);
+        buffer.put(nonce);
+        buffer.put(ciphertextWithTag);
+
+        return buffer.array();
     }
 
     @Override
@@ -114,21 +188,8 @@ public class DefaultCryptographyService implements CryptographyService {
             keyPairGenerator.initialize(2048);
             KeyPair keyPair = keyPairGenerator.generateKeyPair();
 
-            X500NameBuilder nameBuilder = getX500NameBuilder(certificateInfo);
+            X500Name subject = getX500Name(certificateInfo);
 
-            // Add given names
-            List<String> givenNames = certificateInfo.getGivenNames();
-            if (givenNames != null) {
-                for (String givenName : givenNames) {
-                    if (givenName != null && !givenName.isEmpty()) {
-                        nameBuilder.addRDN(BCStyle.GIVENNAME, givenName);
-                    }
-                }
-            }
-
-            X500Name subject = nameBuilder.build();
-
-            // Create CSR
             PKCS10CertificationRequestBuilder requestBuilder =
                     new JcaPKCS10CertificationRequestBuilder(subject, keyPair.getPublic());
 
@@ -137,7 +198,9 @@ public class DefaultCryptographyService implements CryptographyService {
 
             PKCS10CertificationRequest csr = requestBuilder.build(signer);
 
-            return new CsrResult(csr.getEncoded(), keyPair.getPrivate().getEncoded());
+            var csrDer = csr.toASN1Structure().getEncoded(ASN1Encoding.DER);
+
+            return new CsrResult(csrDer, keyPair.getPrivate().getEncoded());
         } catch (IOException | OperatorCreationException | NoSuchAlgorithmException e) {
             throw new SystemKSeFSDKException(e.getMessage(), e);
         }
@@ -162,15 +225,35 @@ public class DefaultCryptographyService implements CryptographyService {
         }
     }
 
-    private byte[] encryptWithRSAUsingPublicKey(byte[] content, byte[] publicKeyBytes) throws SystemKSeFSDKException {
-        // Parse PEM content to get public key
-        try {
-            PublicKey publicKey = parsePublicKeyFromPem(publicKeyBytes);
+    @Override
+    public PublicKey parsePublicKeyFromPem(String pem) throws CertificateException, IOException {
+        CertificateFactory factory = CertificateFactory.getInstance("X.509");
 
+        try (ByteArrayInputStream input = new ByteArrayInputStream(pem.getBytes(StandardCharsets.UTF_8))) {
+            X509Certificate certificate = (X509Certificate) factory.generateCertificate(input);
+            return certificate.getPublicKey();
+        }
+    }
+
+    @Override
+    public PrivateKey parsePrivateKeyFromPem(byte[] privateKey) throws SystemKSeFSDKException {
+        try {
+            PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(privateKey);
+
+            KeyFactory keyFactory = KeyFactory.getInstance(RSA);
+
+            return keyFactory.generatePrivate(keySpec);
+        } catch (NoSuchAlgorithmException | InvalidKeySpecException e) {
+            throw new SystemKSeFSDKException(e.getMessage(), e);
+        }
+    }
+
+    private byte[] encryptWithRSAUsingPublicKey(byte[] content, PublicKey publicKey) throws SystemKSeFSDKException {
+        try {
             OAEPParameterSpec oaepParams = new OAEPParameterSpec(
-                    SHA_256,       // Hash algorithm (SHA-1, SHA-256, etc.)
-                    MGF_1,              // Mask generation function
-                    MGF1ParameterSpec.SHA256,             // MGF1 parameter spec
+                    SHA_256,
+                    MGF_1,
+                    MGF1ParameterSpec.SHA256,
                     PSource.PSpecified.DEFAULT
             );
 
@@ -184,28 +267,20 @@ public class DefaultCryptographyService implements CryptographyService {
         }
     }
 
-    private PublicKey parsePublicKeyFromPem(byte[] publicKey) throws SystemKSeFSDKException {
-        try {
-            String publicKeyPEM = new String(publicKey, StandardCharsets.UTF_8);
+    private static X500Name getX500Name(CertificateEnrollmentsInfoResponse certificateInfo) {
+        X500NameBuilder nameBuilder = getX500NameBuilder(certificateInfo);
 
-            try (StringReader stringReader = new StringReader(publicKeyPEM);
-                 PemReader pemReader = new PemReader(stringReader)) {
-
-                PemObject pemObject = pemReader.readPemObject();
-                byte[] keyBytes = pemObject.getContent();
-
-                KeyFactory keyFactory = KeyFactory.getInstance(RSA);
-                X509EncodedKeySpec keySpec = new X509EncodedKeySpec(keyBytes);
-
-                return keyFactory.generatePublic(keySpec);
-            }
-        } catch (IOException | NoSuchAlgorithmException | InvalidKeySpecException e) {
-            throw new SystemKSeFSDKException(e.getMessage(), e);
+        if (Objects.nonNull(certificateInfo.getGivenNames())) {
+            certificateInfo.getGivenNames()
+                    .stream()
+                    .filter(StringUtils::isNotBlank)
+                    .forEach(z -> nameBuilder.addRDN(BCStyle.GIVENNAME, z));
         }
+
+        return nameBuilder.build();
     }
 
     private static X500NameBuilder getX500NameBuilder(CertificateEnrollmentsInfoResponse certificateInfo) {
-        // Build the subject name
         X500NameBuilder nameBuilder = new X500NameBuilder(BCStyle.INSTANCE);
 
         if (certificateInfo.getCommonName() != null && !certificateInfo.getCommonName().isEmpty()) {

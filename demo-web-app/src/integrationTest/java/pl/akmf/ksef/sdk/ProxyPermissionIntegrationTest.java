@@ -5,38 +5,58 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import pl.akmf.ksef.sdk.api.builders.permission.proxy.GrantProxyEntityPermissionsRequestBuilder;
 import pl.akmf.ksef.sdk.client.model.ApiException;
+import pl.akmf.ksef.sdk.client.model.permission.proxy.ProxyEntityPermissionType;
 import pl.akmf.ksef.sdk.client.model.permission.proxy.SubjectIdentifier;
 import pl.akmf.ksef.sdk.client.model.permission.proxy.SubjectIdentifierType;
-import pl.akmf.ksef.sdk.client.model.permission.proxy.ProxyEntityPermissionType;
+import pl.akmf.ksef.sdk.client.model.permission.search.EntityAuthorizationGrant;
+import pl.akmf.ksef.sdk.client.model.permission.search.EntityAuthorizationPermissionsQueryRequest;
 import pl.akmf.ksef.sdk.client.model.xml.ContextIdentifierTypeEnum;
 import pl.akmf.ksef.sdk.configuration.BaseIntegrationTest;
 
 import java.io.IOException;
+import java.util.List;
 
-public class ProxyPermissionIntegrationTest extends BaseIntegrationTest {
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.awaitility.Awaitility.await;
+
+class ProxyPermissionIntegrationTest extends BaseIntegrationTest {
 
     @Test
-    void proxyPermissionE2EIntegrationTest() throws JAXBException, IOException, InterruptedException, ApiException {
+    void proxyPermissionE2EIntegrationTest() throws JAXBException, IOException, ApiException {
         String contextNip = TestUtils.generateRandomNIP();
         String subjectNip = TestUtils.generateRandomNIP();
         authWithCustomNip(contextNip, ContextIdentifierTypeEnum.NIP, contextNip);
 
         var grantReferenceNumber = grantPermission(subjectNip);
 
-        Thread.sleep(5000);
+        await().atMost(15, SECONDS)
+                .pollInterval(1, SECONDS)
+                .until(() -> isPermissionStatusReady(grantReferenceNumber));
 
-        checkPermissionStatus(grantReferenceNumber);
-        authWithCustomNip(subjectNip, ContextIdentifierTypeEnum.NIP, subjectNip);
+        var permission = searchRole(1);
 
-        //TODO ALWAYS RETURN EMPTY
-//        searchGrantedRole(1);
+        permission.forEach(e -> {
+            var revokeReferenceNumber = revokePermission(e);
+
+            await().atMost(30, SECONDS)
+                    .pollInterval(2, SECONDS)
+                    .until(() -> isPermissionStatusReady(revokeReferenceNumber));
+        });
+        searchRole(0);
     }
 
-    private void checkPermissionStatus(String referenceNumber) throws ApiException {
-        var status = defaultKsefClient.operations(referenceNumber);
+    private Boolean isPermissionStatusReady(String grantReferenceNumber) throws ApiException {
+        var status = defaultKsefClient.permissionOperationStatus(grantReferenceNumber);
+        return status != null && status.getStatus().getCode() == 200;
+    }
 
-        Assertions.assertNotNull(status);
-        Assertions.assertEquals(200, status.getStatus().getCode());
+    private String revokePermission(String operationId) {
+        try {
+            return defaultKsefClient.revokeAuthorizationsPermission(operationId).getOperationReferenceNumber();
+        } catch (ApiException e) {
+            Assertions.fail(e.getMessage());
+        }
+        return null;
     }
 
     private String grantPermission(String subjectNip) throws ApiException {
@@ -51,10 +71,15 @@ public class ProxyPermissionIntegrationTest extends BaseIntegrationTest {
         return response.getOperationReferenceNumber();
     }
 
-    private void searchGrantedRole(int expectedRole) throws ApiException {
-        var response = defaultKsefClient.searchEntityInvoiceRoles(0, 10);
+    private List<String> searchRole(int expectedRole) throws ApiException {
+        var response = defaultKsefClient.searchEntityAuthorizationGrants(new EntityAuthorizationPermissionsQueryRequest(), 0, 10);
 
         Assertions.assertNotNull(response);
-        Assertions.assertEquals(expectedRole, response.getRoles().size());
+        Assertions.assertEquals(expectedRole, response.getAuthorizationGrants().size());
+
+        return response.getAuthorizationGrants()
+                .stream()
+                .map(EntityAuthorizationGrant::getId)
+                .toList();
     }
 }

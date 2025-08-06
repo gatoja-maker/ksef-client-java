@@ -37,16 +37,21 @@ val jakartaVersion = "4.0.2"
 val jakartaValidationApiVersion = "3.0.2"
 val jakartaAnnotationApiVersion = "3.0.0"
 val jacksonDatabindNullableVersion = "0.2.6"
+val commonsCollectionsVersion = "4.5.0"
+val santuarioXmlsecVersion = "3.0.4"
+val httpcomponentsHttpClientVersion = "4.3.6"
+val bouncycastleBcpkixJdk18onVersion = 1.76
 val jsr310Version = "2.15.2"
-val junitVersion = "4.4"
-val junitEngineVersion = "5.8.2"
 val jsxbVarsion = "4.0.5"
 val wiremockStandaloneVersion = "3.9.1"
 val testcontainersVersion = "1.20.0"
 val junitJupiterVersion = "5.10.3"
-
+val awaitilityVersion = "4.2.0"
+val googleZxingCodeVersion = "3.5.3"
+val googleZxingJavaseVersion = "3.5.3"
 
 val xjc by configurations.creating
+
 dependencies {
     implementation(project(":ksef-client"))
 
@@ -59,10 +64,14 @@ dependencies {
 
     //
     implementation("org.apache.commons:commons-lang3")
-    implementation("org.apache.commons:commons-collections4:4.5.0-M2")
-    implementation("org.apache.httpcomponents:httpclient:4.3.6")
-    implementation("org.apache.santuario:xmlsec:3.0.4")
-    implementation("org.bouncycastle:bcpkix-jdk18on:1.76")
+    implementation("org.apache.commons:commons-collections4:$commonsCollectionsVersion")
+    implementation("org.apache.httpcomponents:httpclient:$httpcomponentsHttpClientVersion")
+    implementation("org.apache.santuario:xmlsec:$santuarioXmlsecVersion")
+    implementation("org.bouncycastle:bcpkix-jdk18on:$bouncycastleBcpkixJdk18onVersion")
+
+    //qr code
+    implementation("com.google.zxing:core:$googleZxingCodeVersion")
+    implementation("com.google.zxing:javase:$googleZxingJavaseVersion")
 
     implementation("org.springframework.boot:spring-boot-starter-web")
     compileOnly("org.projectlombok:lombok")
@@ -70,6 +79,7 @@ dependencies {
     annotationProcessor("org.projectlombok:lombok")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.testcontainers:junit-jupiter")
+
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 
     integrationTestImplementation("org.springframework.boot:spring-boot-testcontainers:") {
@@ -79,7 +89,8 @@ dependencies {
     integrationTestImplementation("org.testcontainers:testcontainers:${testcontainersVersion}")
     integrationTestImplementation("org.junit.jupiter:junit-jupiter-api:${junitJupiterVersion}")
     integrationTestImplementation("org.wiremock:wiremock-standalone:${wiremockStandaloneVersion}")
-    integrationTestImplementation("org.springframework.boot:spring-boot-starter-webflux")}
+    implementation("org.awaitility:awaitility:${awaitilityVersion}")}
+
 
 sourceSets {
     create("integrationTest") {
