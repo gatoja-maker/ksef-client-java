@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>KSeF Demo Client</title>
+    <style>
+        body { font-family: sans-serif; margin: 2em; }
+        .container { max-width: 800px; margin: auto; padding: 1em; border: 1px solid #ccc; border-radius: 5px; }
+        .section { margin-bottom: 2em; }
+        h2 { border-bottom: 1px solid #ccc; padding-bottom: 5px; }
+        input, textarea, button { padding: 8px; margin-bottom: 10px; width: 100%; box-sizing: border-box; }
+        button { cursor: pointer; }
+        pre { background-color: #f4f4f4; padding: 1em; border: 1px solid #ddd; white-space: pre-wrap; word-wrap: break-word; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Klient Demonstracyjny KSeF</h1>
+
+    <div class="section">
+        <h2>Uwierzytelnianie za pomocą certyfikatu</h2>
+        <label for="authContextCert">Kontekst (NIP):</label>
+        <input type="text" id="authContextCert" placeholder="np. 1111111111">
+        <label for="cert">Certyfikat (Base64):</label>
+        <textarea id="cert" rows="5"></textarea>
+        <label for="privateKey">Klucz prywatny (Base64):</label>
+        <textarea id="privateKey" rows="5"></textarea>
+        <button onclick="authWithCert()">Uwierzytelnij</button>
+        <pre id="authCertResult">Oczekiwanie na wynik...</pre>
+    </div>
+
+    <div class="section">
+        <h2>Faktury</h2>
+        <label for="ksefNumber">Numer KSeF:</label>
+        <input type="text" id="ksefNumber" placeholder="np. 1234567890-20240101-ABCDEF123456">
+        <button onclick="getInvoice()">Pobierz fakturę</button>
+        <pre id="invoiceResult">Oczekiwanie na wynik...</pre>
+    </div>
+
+</div>
+
+<script>
+    async function authWithCert() {
+        const context = document.getElementById('authContextCert').value;
+        const cert = document.getElementById('cert').value;
+        const privateKey = document.getElementById('privateKey').value;
+        const resultElement = document.getElementById('authCertResult');
+
+        if (!context || !cert || !privateKey) {
+            resultElement.textContent = 'Proszę wypełnić wszystkie pola.';
+            return;
+        }
+
+        resultElement.textContent = 'Uwierzytelnianie...';
+
+        try {
+            const response = await fetch(`/auth-with-ksef-certificate`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    contextIdentifier: context,
+                    certInBase64: cert,
+                    privateKeyBase64: privateKey
+                })
+            });
+            const data = await response.json();
+
+            if (response.ok) {
+                resultElement.textContent = JSON.stringify(data, null, 2);
+            } else {
+                resultElement.textContent = `Błąd: ${response.status} ${response.statusText}\n\n${JSON.stringify(data, null, 2)}`;
+            }
+        } catch (error) {
+            resultElement.textContent = `Wystąpił błąd sieci lub serwera: ${error}\n\n${error.stack}`;
+        }
+    }
+
+    async function getInvoice() {
+        const ksefNumber = document.getElementById('ksefNumber').value;
+        const resultElement = document.getElementById('invoiceResult');
+
+        if (!ksefNumber) {
+            resultElement.textContent = 'Proszę wprowadzić numer KSeF.';
+            return;
+        }
+
+        resultElement.textContent = 'Pobieranie...';
+
+        try {
+            const response = await fetch(`/invoices/ksef/${ksefNumber}`);
+            const data = await response.text();
+
+            if (response.ok) {
+                resultElement.textContent = data;
+            } else {
+                resultElement.textContent = `Błąd: ${response.status} ${response.statusText}\n\n${data}`;
+            }
+        } catch (error) {
+            resultElement.textContent = `Wystąpił błąd sieci lub serwera: ${error}\n\n${error.stack}`;
+        }
+    }
+</script>
+
+</body>
+</html>

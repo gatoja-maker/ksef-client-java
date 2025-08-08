@@ -55,8 +55,10 @@ public class AuthController {
      */
     @PostMapping(value = "/auth-step-by-step/{context}")
     public AuthenticationOperationStatusResponse authStepByStep(@PathVariable String context) throws ApiException, JAXBException, IOException, InterruptedException {
+        log.info("Starting authentication for context: {}", context);
         //wykonanie auth challenge
         var challenge = ksefClient.getAuthChallenge();
+        log.info("Challenge received: {}", challenge.getChallenge());
 
         //xml niezbędny do uwierzytelnienia
         AuthTokenRequest authTokenRequest = new AuthTokenRequestBuilder()
@@ -66,26 +68,34 @@ public class AuthController {
                 .build();
 
         var xml = AuthTokenRequestSerializer.authTokenRequestSerializer(authTokenRequest);
+        log.info("AuthTokenRequest XML created.");
 
         //wygenerowanie certyfikatu oraz klucza prywatnego
         var x500 = new CertificateBuilders()
                 .buildForOrganization("Kowalski sp. z o.o", "VATPL-" + context, "Kowalski");
+        log.info("X500 data created.");
 
         SelfSignedCertificate cert = new DefaultCertificateGenerator().generateSelfSignedCertificateRsa(x500);
+        log.info("Self-signed certificate generated.");
 
         //podpisanie xml wygenerowanym certyfikatem oraz kluczem prywatnym
         var signedXml = new DefaultSignatureService().sign(xml.getBytes(), cert.certificate(), cert.getPrivateKey());
+        log.info("XML signed.");
 
         // Przesłanie podpisanego XML do systemu KSeF
         var submitAuthTokenResponse = ksefClient.submitAuthTokenRequest(signedXml, false);
+        log.info("Signed XML submitted. Reference number: {}", submitAuthTokenResponse.getReferenceNumber());
 
         //Czekanie na zakończenie procesu
         await().atMost(4, SECONDS)
                 .pollInterval(1, SECONDS)
                 .until(() -> isSessionStatusReady(submitAuthTokenResponse.getReferenceNumber()));
+        log.info("Session status is ready.");
 
         //pobranie tokenów
-        return ksefClient.redeemToken();
+        var tokens = ksefClient.redeemToken();
+        log.info("Tokens redeemed successfully.");
+        return tokens;
     }
 
     @PostMapping(value = "auth-with-ksef-certificate")
