@@ -8,7 +8,7 @@
         .container { max-width: 800px; margin: auto; padding: 1em; border: 1px solid #ccc; border-radius: 5px; }
         .section { margin-bottom: 2em; }
         h2 { border-bottom: 1px solid #ccc; padding-bottom: 5px; }
-        input, select, button { padding: 8px; margin-bottom: 10px; }
+        input, textarea, button { padding: 8px; margin-bottom: 10px; width: 100%; box-sizing: border-box; }
         button { cursor: pointer; }
         pre { background-color: #f4f4f4; padding: 1em; border: 1px solid #ddd; white-space: pre-wrap; word-wrap: break-word; }
     </style>
@@ -19,11 +19,15 @@
     <h1>Klient Demonstracyjny KSeF</h1>
 
     <div class="section">
-        <h2>Uwierzytelnianie</h2>
-        <label for="authContext">Kontekst (NIP):</label>
-        <input type="text" id="authContext" placeholder="np. 1111111111">
-        <button onclick="authStepByStep()">Uwierzytelnij</button>
-        <pre id="authResult">Oczekiwanie na wynik...</pre>
+        <h2>Uwierzytelnianie za pomocą certyfikatu</h2>
+        <label for="authContextCert">Kontekst (NIP):</label>
+        <input type="text" id="authContextCert" value="7742385950">
+        <label for="cert">Certyfikat (Base64):</label>
+        <textarea id="cert" rows="5">MIIDszCCApugAwIBAgIULt4D3EgkzuDzPqs+DFnki0NVdhswDQYJKoZIhvcNAQELBQAwaTELMAkGA1UEBhMCUEwxFDASBgNVBAgMC01hem93aWVja2llMREwDwYDVQQHDAhXYXJzemF3YTENMAsGA1UECgwEVGVzdDENMAsGA1UECwwEVGVzdDETMBEGA1UEAwwKNzc0MjM4NTk1MDAeFw0yNTA4MDgxNDI4MTBaFw0yNjA4MDgxNDI4MTBaMGkxCzAJBgNVBAYTAlBMMRQwEgYDVQQIDAtNYXpvd2llY2tpZTERMA8GA1UEBwwIV2Fyc3phd2ExDTALBgNVBAoMBFRlc3QxDTALBgNVBAsMBFRlc3QxEzARBgNVBAMMCjc3NDIzODU5NTAwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDcjAfXpzMpJIYcLxlAtgvG7kqaw0CZDHm6XtMAfILEI0fyJZ/OsEI4Wgor4MkfGtKDi+wvGTJ7XvD2zOvMVhn7bY7+VTzJRCSlhp2cfO3jt0ooIP8fSlWq9OB3Wx3NvtMF3BX405QqlqjQRi3yDuYHK/cMiw8fgOaMVkROwrcGEtWBN/P/kK0+dQi8J9MPMITdWRue+zzXZmlokKwkoFSCRc+cXPgLEhjbSye4uQZhUUClO5JtF2+nDx1RBaXxWYeKGxPVYLNRVpPmNg0FYw4Yz58D5NdTsRJeFwMbNLwRVIm6omDFjaO/7NHC5TIoUiSE47WrMQgzL5E61NXGGmHdAgMBAAGjUzBRMB0GA1UdDgQWBBRt6OYYzCqtFIFz/yl17QbvHcdyxjAfBgNVHSMEGDAWgBRt6OYYzCqtFIFz/yl17QbvHcdyxjAPBgNVHRMBAf8EBTADAQH/MA0GCSqGSIb3DQEBCwUAA4IBAQBUyyBpEUKLWb3JRVkn4PIjyg4BAVnRETJBzH3fmlxySdUEXHrBJAZ67idCbc04GUpjf8yxY++HaWFplKgIh7dhtIbRpWnUn5Ow0VwywRPgf715pIkx5VXCFh1isKgm0HEEr1g0YeAMO9OrvBVU8e2YP5cvyu2g2IfNl5yqqNFYF8Pwj5uWztDF9xOMyWGFguCzbwxOu/VaeGqJeOKeZyRaut/KWlIag0c3TIKa0r8FrzZfZQa/vpWezzHZXYigNmvibzLDCyiBo8EV2fq/oT5PUkfY49FrL86q2Mb2Y/dU1Fv20HCNnzbelGXZBVvgP8GMVjJ8yuuXcs5RtOJJVXFa</textarea>
+        <label for="privateKey">Klucz prywatny (Base64):</label>
+        <textarea id="privateKey" rows="5">MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQDcjAfXpzMpJIYcLxlAtgvG7kqaw0CZDHm6XtMAfILEI0fyJZ/OsEI4Wgor4MkfGtKDi+wvGTJ7XvD2zOvMVhn7bY7+VTzJRCSlhp2cfO3jt0ooIP8fSlWq9OB3Wx3NvtMF3BX405QqlqjQRi3yDuYHK/cMiw8fgOaMVkROwrcGEtWBN/P/kK0+dQi8J9MPMITdWRue+zzXZmlokKwkoFSCRc+cXPgLEhjbSye4uQZhUUClO5JtF2+nDx1RBaXxWYeKGxPVYLNRVpPmNg0FYw4Yz58D5NdTsRJeFwMbNLwRVIm6omDFjaO/7NHC5TIoUiSE47WrMQgzL5E61NXGGmHdAgMBAAECggEAGocxbkwrSDifdQZpSDJdikkhaiowO/iXL8a2JKnVZNhFkCfcaBUlcffKn2qDZp1oUvBisWubeeF6pIUTm9mDeI2+FHOWQzNSISLnFGqmhqyGW/tUFKRxV4Xq9hBcrmHUqjDF588zVEgY+Cxo3GPUYWp1ZenYINb1ZE4AG2UqdK1YF4qLLHfHiPZ8iEtjEwuP9YTw3S8nYMar0eSuFK3DsFJ4s+P+JOA2G8L/ajsCtiLoL06hhKBTRjcyja5auD/wDWwGcRrF+1hNJhtXM7LA1NdB/gAHpsLcrqWvhs17owiSl+9fJirttTDxEl0kFt6RNwNi0lVB6Kbg1s/iigcddQKBgQD0eVNQUU3+QHIjOVGSRSVttEUDG/nsYdCxGRSa5FFMbKEbUvIa/jaSKio2VrtzeJZqBeN5iADbj1Vl0YK7nLOvoNDpbGZYUrnR0lsrOvgC/hTTCjr7X5Yex/ZU25BRg4C0qxls6Ym4XEnA23KjWFY0DMagQ0zvvlfr9srPJG7CewKBgQDm8ete9p2+Q4obKrPZooApmoRIw/RWqhAQ8uHgj0KljYDRkUMMTjfSCN9eyJCnn5OAMxxySkCzpAjNAB17qzy2Ug0mUGMuiFRSrNxuRqsyWOqSpgow8n9RMfaFxNqq5w/TWwIENZQlD5IbBr8WKuzV82bGTlSlVe7htjKTYXqJhwKBgBv2ZJkjM5CJPoTY4YOhdQ5/OAWLBaML7RrUi47L3qCnLCY77oU33nYJbJqagQZMHKgz1DjqXW6/jjz/Ibzjx4mnEz4fr/UaQTbGoLbpH8T32tnoqaZm4HzU0lASbQdlyyrfByF19NKpe6Ybc5lLWVDKxU0/ZWVmmBfdOoVG3YRRAoGARpR2x439RZGkmorhbkjwfEaB2S8x9G6C/HsONy/xQWFOlj2bzR32h1U41uHa+6+UR6DXN8KjpYMjQWuglxQNOPc4l5YHycfWZXH46Cbm2Ts9bVYbVTw3Vtw7KESyQ3rcZk6w/hJV1UG9+E6GhcLWoMiDh2WXDvSFTiv9pvcqmO8CgYBdMksszR2zaaX3ZiHUbv9fy+2GRgVvnLxOiJeE4VVPgj4EmmwSFsXlvJyePNrhAEHFWzEsGnMbWdOgmujWfjgFTVs+SFmI7EAt9L5KEbmn2UwI1n04juFHvrs1vHKYWpJpm+ETZj/4+kZ2F2AUeVAIvhc8VYltD4lYVNlNAfYX7w==</textarea>
+        <button onclick="authWithCert()">Uwierzytelnij</button>
+        <pre id="authCertResult">Oczekiwanie na wynik...</pre>
     </div>
 
     <div class="section">
@@ -37,19 +41,31 @@
 </div>
 
 <script>
-    async function authStepByStep() {
-        const context = document.getElementById('authContext').value;
-        const resultElement = document.getElementById('authResult');
+    async function authWithCert() {
+        const context = document.getElementById('authContextCert').value;
+        const cert = document.getElementById('cert').value;
+        const privateKey = document.getElementById('privateKey').value;
+        const resultElement = document.getElementById('authCertResult');
 
-        if (!context) {
-            resultElement.textContent = 'Proszę wprowadzić kontekst (NIP).';
+        if (!context || !cert || !privateKey) {
+            resultElement.textContent = 'Proszę wypełnić wszystkie pola.';
             return;
         }
 
         resultElement.textContent = 'Uwierzytelnianie...';
 
         try {
-            const response = await fetch(`/auth-step-by-step/${context}`, { method: 'POST' });
+            const response = await fetch(`/auth-with-ksef-certificate`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    contextIdentifier: context,
+                    certInBase64: cert,
+                    privateKeyBase64: privateKey
+                })
+            });
             const data = await response.json();
 
             if (response.ok) {
@@ -58,7 +74,7 @@
                 resultElement.textContent = `Błąd: ${response.status} ${response.statusText}\n\n${JSON.stringify(data, null, 2)}`;
             }
         } catch (error) {
-            resultElement.textContent = `Wystąpił błąd sieci lub serwera: ${error}`;
+            resultElement.textContent = `Wystąpił błąd sieci lub serwera: ${error}\n\n${error.stack}`;
         }
     }
 
@@ -83,7 +99,7 @@
                 resultElement.textContent = `Błąd: ${response.status} ${response.statusText}\n\n${data}`;
             }
         } catch (error) {
-            resultElement.textContent = `Wystąpił błąd sieci lub serwera: ${error}`;
+            resultElement.textContent = `Wystąpił błąd sieci lub serwera: ${error}\n\n${error.stack}`;
         }
     }
 </script>
